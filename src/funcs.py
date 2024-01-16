@@ -8,6 +8,12 @@ def refine_knotvector(knotvector, p):
     refined_knotvector = np.concatenate([knotvector[:p], np.unique(np.sort(np.concatenate([knots, mids]))), knotvector[-p:]])
     return refined_knotvector
 
+def tensor_product(args):
+    if len(args)==2:
+        return tensor_product_2D(args[0], args[1])
+    if len(args)==3:
+        return tensor_product_3D(args[0], args[1], args[2])
+    
 @njit
 def tensor_product_2D(X, Y):
     return np.einsum("i, j -> ij", X, Y)

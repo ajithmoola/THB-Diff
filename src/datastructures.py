@@ -12,6 +12,7 @@ class BSpline:
         self.next_level = BSpline(new_knotvector, self.degree)
         return self.next_level
 
+
 class TensorProduct:
 
     def __init__(self, args):
@@ -20,6 +21,7 @@ class TensorProduct:
     def refine_tensorproduct(self):
         self.next_level = TensorProduct((bs.refine_bspline() for bs in self.bsplines))
         return self.next_level
+
 
 class Hierarchy:
 
