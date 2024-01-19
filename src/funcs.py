@@ -3,6 +3,7 @@ from numba import njit
 
 
 def refine_knotvector(knotvector, p):
+    # Tested: Working!
     knots = np.unique(knotvector)
     mids = 0.5*(knots[1:]+knots[:-1])
     refined_knotvector = np.concatenate([knotvector[:p], np.unique(np.sort(np.concatenate([knots, mids]))), knotvector[-p:]])

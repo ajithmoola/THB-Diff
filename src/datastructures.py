@@ -4,30 +4,32 @@ from funcs import refine_knotvector
 class BSpline:
 
     def __init__(self, knotvector, degree):
+        # tested: working!
         self.knotvector = knotvector
         self.degree = degree
     
     def refine_bspline(self):
-        new_knotvector = refine_knotvector(self.knotvector)
+        new_knotvector = refine_knotvector(self.knotvector, self.degree)
         self.next_level = BSpline(new_knotvector, self.degree)
         return self.next_level
 
 
 class TensorProduct:
-
-    def __init__(self, args):
-        self.bsplines = args
+    # tested: working!
+    def __init__(self, bsplines):
+        self.bsplines = bsplines
     
     def refine_tensorproduct(self):
-        self.next_level = TensorProduct((bs.refine_bspline() for bs in self.bsplines))
+        self.next_level = TensorProduct([bs.refine_bspline() for bs in self.bsplines])
         return self.next_level
 
 
 class Hierarchy:
-
+    #tested: working!
     def __init__(self, InitialSpace):
         self.H = {0: InitialSpace}
         self.degrees = (bs.degree for bs in InitialSpace.bsplines)
+        self.max_level = 0
     
     def construct_multilevel_sequence(self, num_levels):
         self.num_levels = num_levels
