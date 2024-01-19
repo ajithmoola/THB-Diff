@@ -40,7 +40,6 @@ class Space:
                 refined_knotvector = self.knotvectors[lev+1][dim]
                 curr_coeff[dim] = assemble_Tmatrix(knotvector, refined_knotvector, knotvector.size, refined_knotvector.size, self.degrees[dim]).T
             self.Coeff[lev] = curr_coeff
-        
     
     def build_hierarchy_from_domain_sequence(self):
         # tested: working! (not sure 100%)

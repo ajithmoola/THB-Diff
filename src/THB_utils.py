@@ -18,11 +18,65 @@ def compute_active_cells_active_supp(cells, fns, degrees):
         curr_ac_cells = list(zip(*np.nonzero(cells[lev])))
         curr_lev_ac_cells_ac_supp = {}
         for cell in curr_ac_cells:
-            curr_lev_ac_cells_ac_supp[cell] = compute_cell_active_supp(cell, lev, fns, degrees)
+            curr_lev_ac_cells_ac_supp[cell] = _compute_cell_active_supp(cell, lev, fns, degrees)
         ac_cells[lev] = curr_lev_ac_cells_ac_supp
     return ac_cells
 
-def compute_cell_active_supp(cellIdx, curr_level, fns, degrees):
+def compute_fn_projection_matrices(fns, coeffs, degrees):
+    # its working ig
+    # TODO: verify the logic
+    fn_coeffs = {}
+    temp_fn_coeffs = {}
+    ndim = len(degrees)
+    max_lev = max(fns.keys())
+    temp_fn_coeffs = {}
+    for lev in range(max_lev-1, -1, -1):
+        # TODO: this may not work if max_lev is 0
+        curr_coeff = coeffs[lev]
+        curr_lev_fn_coeffs = {}
+        temp_curr_lev_fn_coeffs = {}
+        for fn in np.ndindex(fns[lev].shape):
+            # Get indices of children basis functions
+            children = get_children_fns(fn, coeffs, lev, ndim)
+            ac_children = [child for child in children if fns[lev+1][child]==1]
+            # Vector projecting children basis functions to current level
+            curr_fn_coeff = deepcopy([curr_coeff[dim] for dim in range(ndim)])
+            non_zero_bool_arr_before_trunc = [coeff!=0 for coeff in curr_fn_coeff]
+            # Truncates the basis function if any child function is active
+            for ac_child in ac_children:
+                for dim in range(ndim):
+                    curr_fn_coeff[dim][fn[dim], ac_child[dim]] = 0
+            # TODO: verify the logic
+            if lev<(max_lev-1):
+                for dim in range(ndim):
+                    children_coeffs = deepcopy(coeffs[lev+1][dim])
+                    for child in children:
+                        children_coeffs[child[dim]] = temp_fn_coeffs[lev+1][child][dim][child[dim]]
+                    curr_fn_coeff[dim] = curr_fn_coeff[dim] @ children_coeffs
+            
+            temp_curr_lev_fn_coeffs[fn] = curr_fn_coeff
+            curr_lev_fn_coeffs[fn] = [curr_fn_coeff[dim][fn[dim]] for dim in range(ndim)]
+        temp_fn_coeffs[lev] = temp_curr_lev_fn_coeffs
+        fn_coeffs[lev] = curr_lev_fn_coeffs
+    return fn_coeffs
+
+def get_children_fns(fnIdx, Coeff, level, dims):
+    children = []
+    
+    for dim in range(dims):
+        curr_coeff = Coeff[level][dim]
+        children.append(np.nonzero(curr_coeff[fnIdx[dim]])[0])
+
+    grids = np.meshgrid(*children)
+    combinations = np.stack(grids, axis=-1).reshape(-1, dims)
+
+    return [tuple(row) for row in combinations]
+            
+def get_supp_fns(cellIdx, degrees):
+    ranges = [range(idx, idx+p+1) for idx, p in zip(cellIdx, degrees)]
+    return [basisIdx for basisIdx in product(*ranges)]
+
+def _compute_cell_active_supp(cellIdx, curr_level, fns, degrees):
     # tested: working!
     ac_supp = []
     for lev in range(curr_level, -1, -1):
@@ -58,64 +112,3 @@ def compute_projection_to_highest_level(sub_coeffs):
             curr_coeffs[dim] = sub_coeffs[lev][dim] @ projected_sub_coeffs[lev+1][dim]
         projected_sub_coeffs[lev] = curr_coeffs
     return projected_sub_coeffs
-
-def compute_fn_projection_matrices(fns, coeffs, degrees):
-    # TODO: verify the logic
-    fn_coeffs = {}
-    ndim = len(degrees)
-    max_lev = max(fns.keys())
-    fn_coeffs = {}
-    for lev in range(max_lev-1, -1, -1):
-        # TODO: this may not work if max_lev is 0
-        curr_coeff = coeffs[lev]
-        curr_lev_fn_coeffs = {}
-        for fn in np.ndindex(fns[lev].shape):
-            # Get indices of children basis functions
-            children = get_children_fns(fn, coeffs, lev, ndim)
-            ac_children = [child for child in children if fns[lev+1][child]==1]
-            # Vector projecting children basis functions to current level
-            curr_fn_coeff = deepcopy([curr_coeff[dim] for dim in range(ndim)])
-            non_zero_bool_arr_before_trunc = [coeff!=0 for coeff in curr_fn_coeff]
-            # Truncates the basis function if any child function is active
-            for ac_child in ac_children:
-                for dim in range(ndim):
-                    curr_fn_coeff[dim][fn[dim], ac_child[dim]] = 0
-            
-            if lev<(max_lev-1):
-                for dim in range
-            # Getting nonzero values except truncated children coefficient
-            # non_zero_fn_coeff = [curr_fn_coeff[dim][non_zero_bool_arr_before_trunc[dim]] for dim in range(ndim)]
-            
-            # if lev<(max_lev-1):
-            #     for dim in range(ndim):
-            #         for i, child
-
-            # # projects the subdivision coefficients from l -> l+1 to l -> max_lev
-            # if lev<(max_lev-1):
-            #     for dim in range(dims):
-            #         for i, child in enumerate(children):
-            #             # print(child[dim], child, lev+1)
-            #             child_fn_coeff = fn_coeffs[lev+1][child][dim]
-            #             projection_mat.append(child_fn_coeff)
-            #         projection_mat = np.array(projection_mat)
-            #         non_zero_fn_coeff[dim] = non_zero_fn_coeff[dim].reshape(1, -1) @ np.array(projection_mat).T
-            
-            # curr_lev_fn_coeffs[fn] = non_zero_fn_coeff
-        fn_coeffs[lev] = curr_lev_fn_coeffs
-    return fn_coeffs
-
-def get_children_fns(fnIdx, Coeff, level, dims):
-    children = []
-    
-    for dim in range(dims):
-        curr_coeff = Coeff[level][dim]
-        children.append(np.nonzero(curr_coeff[fnIdx[dim]])[0])
-
-    grids = np.meshgrid(*children)
-    combinations = np.stack(grids, axis=-1).reshape(-1, dims)
-
-    return [tuple(row) for row in combinations]
-            
-def get_supp_fns(cellIdx, degrees):
-    ranges = [range(idx, idx+p+1) for idx, p in zip(cellIdx, degrees)]
-    return [basisIdx for basisIdx in product(*ranges)]

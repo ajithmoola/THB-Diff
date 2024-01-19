@@ -27,5 +27,5 @@ h_space.build_hierarchy_from_domain_sequence()
 ac_cells = compute_active_cells_active_supp(h_space.cells, h_space.fns, h_space.degrees)
 print(ac_cells[1][(4, 4)])
 
-fn_coeffs = compute_projection_matrices(h_space.fns, h_space.Coeff, h_space.degrees)
-print(fn_coeffs[1][(0, 0)])
+fn_coeffs = compute_fn_projection_matrices(h_space.fns, h_space.Coeff, h_space.degrees)
+print(fn_coeffs[0][(0, 0)][0])
