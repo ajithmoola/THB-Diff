@@ -72,8 +72,14 @@ class Space:
                 H[lev+1][idx] = 1
         
         self.fns = H
+
+    def refine_basis_fn(self, fnIdx, level):
+        assert level<self.num_levels-1
+        supp_cells = self.get_support_cell_indices(fnIdx, level)
+        for cell in supp_cells:
+            self._refine_cell(cell, level)
     
-    def refine_cell(self, cellIdx, level):
+    def _refine_cell(self, cellIdx, level):
         self.cells[level][cellIdx] = 0
         children_cells = []
         for offset in product(range(2), repeat=len(cellIdx)):
