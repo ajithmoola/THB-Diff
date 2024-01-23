@@ -1,0 +1,15 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "THB"
+version = "0.1"
+authors = [{name = "Ajith Moola", email = "arma@iastate.edu"}, ]
+license = {file = "LICENSE"}
+readme = "README.md"
+dependencies = []
+description = "Truncated Hierarchical B-spline Module"
+
+[tool.flit.sdist]
+include = ["bootstrap_install.py", "build_dists.py"]
