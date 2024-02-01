@@ -20,11 +20,23 @@ def grevilleAbscissae(fn_sh, degrees, knotvectors):
     CP = np.zeros((*fn_sh, ndim))
     
     for pt in np.ndindex(fn_sh):
-        CP[pt] = np.array([np.sum(knotvectors[dim][pt[dim]:pt[dim]+degrees[dim]+1])/degrees[dim] for dim in range(ndim)])
+        CP[pt] = np.array([np.sum(knotvectors[dim][pt[dim]+1:pt[dim]+degrees[dim]+1])/degrees[dim] for dim in range(ndim)])
     
     return CP
 
-def tensor_product(args):
+def compute_projection(args):
+    if len(args)==2:
+        return np.einsum('ijkl, klmn -> ijmn', *args)
+    elif len(args)==3:
+        return np.einsum('ijklmn, lmnopq -> ijkopq', *args)
+
+def compute_coeff_tensor_product(args):
+    if len(args)==2:
+        return np.einsum('ij, kl -> ikjl', *args)
+    elif len(args)==3:
+        return np.einsum('ij, kl, mn -> ikmjln', *args)
+
+def compute_tensor_product(args):
     if len(args)==2:
         return tensor_product_2D(args[0], args[1])
     if len(args)==3:
@@ -42,18 +54,14 @@ def findSpan(n, p, u, U):
     low = p
     high = n+1
     mid = int((low+high)/2)
-
-    knot_span_idx = 0
     while (u<U[mid] or u>=U[mid+1]):
         if u<U[mid]:
             high = mid
         else:
             low = mid
         mid = int((low+high)/2)
-    knot_span_idx = mid
-    return knot_span_idx
+    return mid
 
-@njit
 def basisFun(i, u, p, U):
     """computes basis functions required to evaluate a point on the b-spline
 

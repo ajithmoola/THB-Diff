@@ -48,41 +48,35 @@ def compute_active_cells_active_supp(cells, fns, degrees):
     return ac_cells
 
 def compute_fn_projection_matrices(fns, coeffs, degrees):
-    # its working ig
-    # TODO: verify the logic
-    fn_coeffs = {}
-    temp_fn_coeffs = {}
-    ndim = len(degrees)
     max_lev = max(fns.keys())
-    temp_fn_coeffs = {}
+    ndim = len(degrees)
+    fn_coeffs = {lev:{} for lev in range(max_lev)}
+    coeffs_tp = {lev: compute_coeff_tensor_product([coeffs[lev][dim] for dim in range(ndim)]) for lev in range(ndim)}
+    # coeffs_tp = {lev: np.einsum('ij, kl -> ikjl', *[coeffs[lev][dim] for dim in range(ndim)]) for lev in range(ndim)}
+    
+    projection_coeff = {}
+    projection_coeff[max_lev-2] = coeffs_tp[max_lev-1]
+    for lev in range(max_lev-3, -1, -1):
+        projection_coeff[lev] = compute_projection([coeffs_tp[lev+1], projection_coeff[lev+1]])
+        # projection_coeff[lev] = np.einsum('ijkl, klmn -> ijmn', coeffs_tp[lev+1], projection_coeff[lev+1])
+
     for lev in range(max_lev-1, -1, -1):
-        # TODO: this may not work if max_lev is 0
-        curr_coeff = coeffs[lev]
-        curr_lev_fn_coeffs = {}
-        temp_curr_lev_fn_coeffs = {}
+        # curr_coeff = deepcopy(coeffs[lev])
+        next_lev_fns = fns[lev+1]
+        curr_coeff_tp = deepcopy(coeffs_tp[lev])
+        
+        #This may not work (write nested loops if this doesnt work)
         for fn in np.ndindex(fns[lev].shape):
-            # Get indices of children basis functions
-            children = get_children_fns(fn, coeffs, lev, ndim)
-            ac_children = [child for child in children if fns[lev+1][child]==1]
-            # Vector projecting children basis functions to current level
-            curr_fn_coeff = deepcopy([curr_coeff[dim] for dim in range(ndim)])
-            non_zero_bool_arr_before_trunc = [coeff!=0 for coeff in curr_fn_coeff]
-            # Truncates the basis function if any child function is active
-            for ac_child in ac_children:
-                for dim in range(ndim):
-                    curr_fn_coeff[dim][fn[dim], ac_child[dim]] = 0
-            # TODO: verify the logic
-            if lev<(max_lev-1):
-                for dim in range(ndim):
-                    children_coeffs = deepcopy(coeffs[lev+1][dim])
-                    for child in children:
-                        children_coeffs[child[dim]] = temp_fn_coeffs[lev+1][child][dim][child[dim]]
-                    curr_fn_coeff[dim] = curr_fn_coeff[dim] @ children_coeffs
-            
-            temp_curr_lev_fn_coeffs[fn] = curr_fn_coeff
-            curr_lev_fn_coeffs[fn] = [curr_fn_coeff[dim][fn[dim]] for dim in range(ndim)]
-        temp_fn_coeffs[lev] = temp_curr_lev_fn_coeffs
-        fn_coeffs[lev] = curr_lev_fn_coeffs
+            for child in np.ndindex(fns[lev+1].shape):
+                if fns[lev+1][child]==1:
+                    curr_coeff_tp[fn][child] = 0
+
+        if lev<(max_lev-1):
+            curr_coeff_tp = compute_projection([curr_coeff_tp, projection_coeff[lev]])
+            # curr_coeff_tp = np.einsum('ijkl, klmn -> ijmn', curr_coeff_tp, projection_coeff[lev])
+        
+        fn_coeffs[lev] = curr_coeff_tp
+
     return fn_coeffs
 
 def compute_active_span(params, knotvectors, cells, degrees, fn_shapes):
@@ -91,9 +85,9 @@ def compute_active_span(params, knotvectors, cells, degrees, fn_shapes):
     active_spans = []
     for param in params:
         for lev in range(max_lev, -1, -1):
-            cellIdx = tuple(findSpan(fn_shapes[lev][dim], degrees[dim], param[dim], knotvectors[lev][dim])-degrees[dim] for dim in range(ndim))
+            cellIdx = tuple(findSpan(fn_shapes[lev][dim]-1, degrees[dim], param[dim], knotvectors[lev][dim])-degrees[dim] for dim in range(ndim))
             if cells[lev][cellIdx]==1:
-                active_spans.append([lev, cellIdx])
+                active_spans.append((lev, cellIdx))
                 break
     return active_spans
 
@@ -101,7 +95,6 @@ def compute_tensor_product(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes
     max_lev = max(knotvectors.keys())
     ndim = len(degrees)
     PHI = []
-    support_fns = []
     num_supp_cumsum = [0]
     for i, g in enumerate(tqdm(params)):
         cell_lev, cellIdx = ac_spans[i]
@@ -112,18 +105,48 @@ def compute_tensor_product(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes
         num_supp_cumsum.append(num_supp_cumsum[i]+len(cell_supp))
         for fn in cell_supp:
             fn_lev, fnIdx = fn
-            sub_coeff = [fn_coeffs[fn_lev][fnIdx][dim][max_lev_cellIdx[dim]:max_lev_cellIdx[dim]+degrees[dim]+1] for dim in range(ndim)]
-            sub_coeff_tp = tensor_product(sub_coeff)
+            slice_tuple = tuple(slice(max_lev_cellIdx[dim]-degrees[dim], max_lev_cellIdx[dim]+1) for dim in range(ndim))
+            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
             fn_tp = tensor_product(basis_fns)
-            fn_value = np.sum(sub_coeff_tp*fn_tp)
+            fn_value = np.sum(sub_coeff*fn_tp)
             all_fn_values.append(fn_value)
         PHI.append(np.array(all_fn_values))
 
     return PHI, num_supp_cumsum
 
-def PHIXCP(PHI, CP):
-    pass
-            
+# def compute_tensor_product(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees):
+#     max_lev = max(knotvectors.keys())
+#     ndim = len(degrees)
+#     PHI = []
+#     support_fns = []
+#     num_supp_cumsum = [0]
+#     for i, g in enumerate(tqdm(params)):
+#         cell_lev, cellIdx = ac_spans[i]
+#         cell_supp = ac_cells_supp[cell_lev][cellIdx]
+#         max_lev_cellIdx = [findSpan(fn_shapes[max_lev][dim], degrees[dim], g[dim], knotvectors[max_lev][dim]) - degrees[dim] for dim in range(ndim)]
+#         basis_fns = [basisFun(max_lev_cellIdx[dim]+degrees[dim], g[dim], degrees[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
+#         all_fn_values = []
+#         num_supp_cumsum.append(num_supp_cumsum[i]+len(cell_supp))
+#         for fn in cell_supp:
+#             fn_lev, fnIdx = fn
+#             sub_coeff = [fn_coeffs[fn_lev][fnIdx][dim][max_lev_cellIdx[dim]:max_lev_cellIdx[dim]+degrees[dim]+1] for dim in range(ndim)]
+#             sub_coeff_tp = tensor_product(sub_coeff)
+#             fn_tp = tensor_product(basis_fns)
+#             fn_value = np.sum(sub_coeff_tp*fn_tp)
+#             all_fn_values.append(fn_value)
+#         PHI.append(np.array(all_fn_values))
+
+#     return PHI, num_supp_cumsum
+
+def evaluate(PHI, ctrl_pts, ac_spans, num_supp_cumsum, ac_cells_ac_supp):
+    output = np.zeros((len(PHI), ctrl_pts[0].shape[-1]))
+    for i, ac_cell in enumerate(ac_spans):
+        supp = ac_cells_ac_supp[ac_cell[0]][ac_cell[1]]
+        phi = PHI[i]
+        for j, (lev, fn) in enumerate(supp):
+            output[i, :] += phi[j]*ctrl_pts[lev][fn]
+    return output
+
 def get_children_fns(fnIdx, Coeff, level, dims):
     children = []
     
@@ -194,3 +217,85 @@ def compute_projection_to_highest_level(sub_coeffs):
             curr_coeffs[dim] = sub_coeffs[lev][dim] @ projected_sub_coeffs[lev+1][dim]
         projected_sub_coeffs[lev] = curr_coeffs
     return projected_sub_coeffs
+
+
+def modified_compute_fn_projection_matrices(fns, coeffs, degrees):
+    # its working
+    # TODO: verify the logic
+    fn_coeffs = {}
+    temp_fn_coeffs = {}
+    ndim = len(degrees)
+    max_lev = max(fns.keys())
+    temp_fn_coeffs = {}
+    for lev in range(max_lev-1, -1, -1):
+        # TODO: this may not work if max_lev is 0
+        curr_coeff = coeffs[lev]
+        curr_lev_fn_coeffs = {}
+        temp_curr_lev_fn_coeffs = {}
+        for fn in np.ndindex(fns[lev].shape):
+            # Get indices of children basis functions
+            children = get_children_fns(fn, coeffs, lev, ndim)
+            ac_children = [child for child in children if fns[lev+1][child]==1]
+            # Vector projecting children basis functions to current level
+            curr_fn_coeff = deepcopy([curr_coeff[dim][fn[dim]] for dim in range(ndim)])
+            if ndim==2:
+                curr_fn_coeff = np.einsum('i,j -> ij', *curr_fn_coeff)
+            elif ndim==3:
+                curr_fn_coeff = np.einsum('i,j,k -> ijk', *curr_fn_coeff)
+            # non_zero_bool_arr_before_trunc = [coeff!=0 for coeff in curr_fn_coeff]
+            # Truncates the basis function if any child function is active
+            for ac_child in ac_children:
+                curr_fn_coeff[ac_child] = 0
+            # TODO: Incorrect! truncation should happen after computing the tensorproduct
+            # if lev<(max_lev-1):
+            #     for dim in range(ndim):
+            #         children_coeffs = deepcopy(coeffs[lev+1][dim])
+            #         for child in children:
+            #             children_coeffs[child[dim]] = temp_fn_coeffs[lev+1][child][dim][child[dim]]
+            #         curr_fn_coeff[dim] = curr_fn_coeff[dim] @ children_coeffs
+            
+            if lev<(max_lev-1):
+                children_coeffs = deepcopy([coeffs[lev+1][dim] for dim in range(ndim)])
+                if ndim==2:
+                    children_coeffs = np.einsum('ij,kl -> ikjl', *children_coeffs)
+                elif ndim==3:
+                    children_coeffs = np.einsum('ij,kl,mn -> ikmjln', *children_coeffs)
+                for child in children:
+                    children_coeffs[child] = temp_fn_coeffs[lev+1][child]
+                if ndim==2:
+                    curr_fn_coeff = np.einsum('ij, ijkl -> kl', curr_fn_coeff, children_coeffs)
+                elif ndim==3:
+                    curr_fn_coeff = np.einsum('ijk, ijklmn -> lmn', curr_fn_coeff, children_coeffs)
+            
+            temp_curr_lev_fn_coeffs[fn] = curr_fn_coeff
+
+            curr_lev_fn_coeffs[fn] = curr_fn_coeff
+        temp_fn_coeffs[lev] = temp_curr_lev_fn_coeffs
+        fn_coeffs[lev] = curr_lev_fn_coeffs
+    return fn_coeffs
+
+# def modified_compute_tensor_product(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees):
+#     max_lev = max(knotvectors.keys())
+#     ndim = len(degrees)
+#     PHI = []
+#     support_fns = []
+#     num_supp_cumsum = [0]
+#     for i, g in enumerate(tqdm(params)):
+#         cell_lev, cellIdx = ac_spans[i]
+#         cell_supp = ac_cells_supp[cell_lev][cellIdx]
+#         max_lev_cellIdx = [findSpan(fn_shapes[max_lev][dim]-1, degrees[dim], g[dim], knotvectors[max_lev][dim]) - degrees[dim] for dim in range(ndim)]
+#         basis_fns = [basisFun(max_lev_cellIdx[dim]+degrees[dim], g[dim], degrees[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
+#         all_fn_values = []
+#         num_supp_cumsum.append(num_supp_cumsum[i]+len(cell_supp))
+#         for fn in cell_supp:
+#             fn_lev, fnIdx = fn
+#             # sub_coeff = [fn_coeffs[fn_lev][fnIdx][dim][max_lev_cellIdx[dim]:max_lev_cellIdx[dim]+degrees[dim]+1] for dim in range(ndim)]
+#             # sub_coeff_tp = tensor_product(sub_coeff)
+#             slice_tuple = tuple(slice(max_lev_cellIdx[dim], max_lev_cellIdx[dim]+degrees[dim]+1) for dim in range(ndim))
+#             sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
+#             fn_tp = tensor_product(basis_fns)
+#             fn_value = np.sum(sub_coeff*fn_tp)
+#             all_fn_values.append(fn_value)
+#         PHI.append(np.array(all_fn_values))
+
+#     return PHI, num_supp_cumsum

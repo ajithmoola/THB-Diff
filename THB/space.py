@@ -23,10 +23,8 @@ class Space:
         self.sh_fns = {level:tuple(self.sh_cells[level][i]+self.degrees[i] for i in range(self.ndim)) for level in range(self.num_levels)}
 
         self.cells = {level:np.zeros(self.sh_cells[level]) for level in range(self.num_levels)}
-        # self.fns = {level:np.zeros(self.sh_fns[level]) for level in range(self.num_levels)}
     
         self.cells[0] = np.ones_like(self.cells[0])
-        # self.fns[0] = np.ones_like(self.fns[0])
 
     def compute_coefficients(self):
         self.Coeff = {}
