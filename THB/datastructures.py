@@ -5,7 +5,6 @@ from copy import deepcopy
 class BSpline:
 
     def __init__(self, knotvector, degree):
-        # tested: working!
         self.knotvector = knotvector
         self.degree = degree
     
@@ -16,7 +15,6 @@ class BSpline:
 
 
 class TensorProduct:
-    # tested: working!
     def __init__(self, bsplines):
         self.bsplines = bsplines
     
@@ -34,7 +32,6 @@ class ControlPoints:
     
     def update_CP(self, ctrl_pts, fns, Coeffs):
         for lev in range(1, self.num_levels):
-            # newly activated control points
             curr_coeff = Coeffs[lev-1]
             for CP in np.ndindex(fns[lev].shape):
                 if self.CP_status[lev][CP]==0 and fns[lev][CP]==1:

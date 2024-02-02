@@ -3,7 +3,6 @@ from numba import njit
 
 
 def refine_knotvector(knotvector, p):
-    # Tested: Working!
     knots = np.unique(knotvector)
     mids = 0.5*(knots[1:]+knots[:-1])
     refined_knotvector = np.concatenate([knotvector[:p], np.unique(np.sort(np.concatenate([knots, mids]))), knotvector[-p:]])
@@ -113,12 +112,3 @@ def assemble_Tmatrix(knotVec, newKnotVec, knotVec_len, newKnotVec_len, p):
             
         T1 = T2
     return T1
-
-
-
-if __name__=='__main__':
-    kv1 = np.array([0, 0, 0, 0.2, 0.4, 0.6, 0.8, 1, 1, 1])
-    p = 2
-    kv2 = refine_knotvector(kv1, p)
-    ualpha = assemble_Tmatrix(kv1, kv2, kv1.size, kv2.size, p)
-    print(ualpha.T.shape)

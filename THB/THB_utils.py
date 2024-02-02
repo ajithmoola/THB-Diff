@@ -6,7 +6,7 @@ def plotGrid(plot, cells, knotvectors, degrees):
     fig, ax = plot
     max_lev = max(knotvectors.keys())
     ndim = len(degrees)
-    knots = {lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(ndim)} for lev in range(max_lev)}
+    knots = {lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(ndim)} for lev in range(max_lev+1)}
     for lev in cells.keys():
         for cellIdx in np.ndindex(cells[lev].shape):
             if cells[lev][cellIdx]==1:
@@ -31,8 +31,8 @@ def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
     fig, ax = plt.subplots()
     ndim = len(degrees)
     max_lev = len(knot_vectors.keys()) - 1
-    knots = {lev: {dim: np.unique(knot_vectors[lev][dim]) for dim in range(ndim)} for lev in range(max_lev)}
-    for lev in range(max_lev):
+    knots = {lev: {dim: np.unique(knot_vectors[lev][dim]) for dim in range(ndim)} for lev in range(max_lev+1)}
+    for lev in range(max_lev+1):
         for cell in ac_cells[lev].keys():
             supp = ac_cells[lev][cell]
 
@@ -75,4 +75,9 @@ def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
                 phi.append(np.array(fn_values))
             out = np.vstack([out, out[0]])
             ax.plot(out[:,0], out[:,1], color='k')
+    ax.set_box_aspect(1)
+    ax.set_axis_off()
+    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+            hspace = 0, wspace = 0)
+    plt.margins(0)
     plt.show()
