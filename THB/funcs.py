@@ -25,27 +25,27 @@ def grevilleAbscissae(fn_sh, degrees, knotvectors):
 
 def compute_projection(args):
     if len(args)==2:
-        return np.einsum('ijkl, klmn -> ijmn', *args)
+        return np.einsum('ijkl, klmn -> ijmn', *args, optimize=True)
     elif len(args)==3:
-        return np.einsum('ijklmn, lmnopq -> ijkopq', *args)
+        return np.einsum('ijklmn, lmnopq -> ijkopq', *args, optimize=True)
 
 def compute_coeff_tensor_product(args):
     if len(args)==2:
-        return np.einsum('ij, kl -> ikjl', *args)
+        return np.einsum('ij, kl -> ikjl', *args, optimize=True)
     elif len(args)==3:
-        return np.einsum('ij, kl, mn -> ikmjln', *args)
+        return np.einsum('ij, kl, mn -> ikmjln', *args, optimize=True)
 
 def compute_tensor_product(args):
     if len(args)==2:
-        return tensor_product_2D(args[0], args[1])
+        return np.einsum('i, j -> ij', *args)
     if len(args)==3:
-        return tensor_product_3D(args[0], args[1], args[2])
+        return np.einsum('i, j, k -> ijk', *args, optimize=True)
     
-def tensor_product_2D(X, Y):
-    return np.einsum("i, j -> ij", X, Y)
+# def tensor_product_2D(X, Y):
+#     return np.einsum("i, j -> ij", X, Y)
 
-def tensor_product_3D(X, Y, Z):
-    return np.einsum("i, j, k -> ijk", X, Y, Z)
+# def tensor_product_3D(X, Y, Z):
+#     return np.einsum("i, j, k -> ijk", X, Y, Z)
 
 def findSpan(n, p, u, U):
     if u==U[n+1]:

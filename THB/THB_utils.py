@@ -56,7 +56,6 @@ def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
             ul = [x1, y2]
             
             param = np.array([ll, lr, ur, ul])
-            # print(param)
             out = np.zeros((4, 2))
             phi = []
             for i, g in enumerate(param):
@@ -67,7 +66,6 @@ def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
                     fn_lev, fnIdx = fn
                     slice_tuple = tuple(slice(max_lev_cellIdx[dim]-degrees[dim], max_lev_cellIdx[dim]+1) for dim in range(ndim))
                     sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-                    # sub_coeff_tp = tensor_product(sub_coeff)
                     fn_tp = compute_tensor_product(basis_fns)
                     fn_value = np.sum(sub_coeff*fn_tp)
                     out[i] += fn_value*ctrl_pts[fn_lev][fnIdx]

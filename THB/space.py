@@ -37,31 +37,21 @@ class Space:
             self.Coeff[lev] = curr_coeff
     
     def build_hierarchy_from_domain_sequence(self):
-        # tested: working! (not sure 100%)
-        # H0 = {beta in B0: supp(beta) not empty}
         H = {level:np.zeros(self.sh_fns[level]) for level in range(self.num_levels)}
         H[0] = np.ones_like(H[0])
 
-        # Recursively updating the basis functions to active or passive
         for lev in range(0, self.num_levels-1):
-            # Iterating over all the basis functions in previous level to compute H_a
             deactivated_fns = []
             H_a = list(zip(*np.nonzero(H[lev])))
             for fn in H_a:
                 supp_cells = self.get_support_cell_indices(fn, lev)
-                # Checking the status of support cells
                 cell_bool = [True if self.cells[lev][cell]==1.0 else False for cell in supp_cells]
-                # deactivating functions whose support is not contained in O_l
                 if np.all(np.array(cell_bool)==False):
                     H[lev][fn] = 0
                     deactivated_fns.append(fn)
-            # If none of the functions are deactivated then break the loop
             if not deactivated_fns:
                 break
-            # TODO: any use for deactivated functions information?
-            # Using simplified hierarchy definition computing Hb
             children = [get_children_fns(de_fn, self.Coeff, lev, self.ndim) for de_fn in deactivated_fns]
-            # print(children)
             H_b = set([item for sublist in children for item in sublist])
             for idx in H_b:
                 H[lev+1][idx] = 1
