@@ -1,8 +1,0 @@
-compute_pts.cpp
-compute_pts_cuda.cpp
-compute_pts_cuda_kernels.cu
-setup.py
-THB_eval.egg-info/PKG-INFO
-THB_eval.egg-info/SOURCES.txt
-THB_eval.egg-info/dependency_links.txt
-THB_eval.egg-info/top_level.txt
