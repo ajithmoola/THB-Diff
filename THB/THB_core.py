@@ -10,7 +10,6 @@ from multiprocessing import Pool
 class THBEval(torch.autograd.Function):
     @staticmethod
     def forward(ctx, ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum, device):
-        
         ctx.save_for_backward(ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
         ctx.device = device
         if device=='cuda':
@@ -44,23 +43,22 @@ def compute_fn_projection_matrices(fns, coeffs, degrees):
     max_lev = max(fns.keys())
     ndim = len(degrees)
     fn_coeffs = {lev:{} for lev in range(max_lev)}
-    coeffs_tp = {lev: compute_coeff_tensor_product([coeffs[lev][dim] for dim in range(ndim)]) for lev in range(ndim)}
+    coeffs_tp = {lev: compute_coeff_tensor_product([coeffs[lev][dim] for dim in range(ndim)]) for lev in range(max_lev)}
     
     projection_coeff = {}
     projection_coeff[max_lev-2] = coeffs_tp[max_lev-1]
     for lev in range(max_lev-3, -1, -1):
-        projection_coeff[lev] = compute_projection([coeffs_tp[lev+1], projection_coeff[lev+1]])
+        projection_coeff[lev] = compute_projection([coeffs_tp[lev+1], projection_coeff[lev+1]], ndim=ndim)
 
     for lev in range(max_lev-1, -1, -1):
         curr_coeff_tp = deepcopy(coeffs_tp[lev])
         indices = np.where(fns[lev+1]==1)
 
-        #Truncation
         for fn in np.ndindex(fns[lev].shape):
             curr_coeff_tp[fn][indices] = 0
 
         if lev<(max_lev-1):
-            curr_coeff_tp = compute_projection([curr_coeff_tp, projection_coeff[lev]])
+            curr_coeff_tp = compute_projection([curr_coeff_tp, projection_coeff[lev]], ndim=ndim)
         
         fn_coeffs[lev] = curr_coeff_tp
 

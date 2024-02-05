@@ -23,10 +23,10 @@ def grevilleAbscissae(fn_sh, degrees, knotvectors):
     
     return CP
 
-def compute_projection(args):
-    if len(args)==2:
+def compute_projection(args, ndim):
+    if ndim==2:
         return np.einsum('ijkl, klmn -> ijmn', *args, optimize=True)
-    elif len(args)==3:
+    elif ndim==3:
         return np.einsum('ijklmn, lmnopq -> ijkopq', *args, optimize=True)
 
 def compute_coeff_tensor_product(args):

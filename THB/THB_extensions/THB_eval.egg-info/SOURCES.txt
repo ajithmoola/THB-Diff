@@ -1,3 +1,4 @@
+compute_pts.cpp
 compute_pts_cuda.cpp
 compute_pts_cuda_kernels.cu
 setup.py
