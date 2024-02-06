@@ -27,16 +27,16 @@ def prepare_data_for_acceleration(PHI, ac_spans, num_supp_cumsum, ctrl_pts, ac_c
     max_lev = max(ctrl_pts.keys())
     nCP = np.zeros(max_lev+2, dtype=np.int_)
     num_supp_cumsum = torch.from_numpy(num_supp_cumsum).to(device=device)
-    PHI = torch.from_numpy(PHI).to(device=device)
+    PHI = torch.from_numpy(PHI).float().to(device=device)
     CP_dim = ctrl_pts[0].shape[-1]
     for lev in range(1, max_lev+2):
         nCP[lev] = nCP[lev-1] + np.prod(fn_sh[lev-1])
     
-    ctrl_pts = torch.vstack([torch.from_numpy(ctrl_pts[lev]).reshape(-1, CP_dim) for lev in range(max_lev+1)]).to(device=device)
+    ctrl_pts = torch.vstack([torch.from_numpy(ctrl_pts[lev]).reshape(-1, CP_dim).float() for lev in range(max_lev+1)]).to(device=device)
     
     Jm = [nCP[fn_lev] + np.ravel_multi_index(fnIdx, fn_sh[fn_lev]) for cell_lev, cellIdx in ac_spans for fn_lev, fnIdx in ac_cells_ac_supp[cell_lev][cellIdx]]
 
-    Jm = torch.tensor(Jm)
+    Jm = torch.tensor(Jm).to(device)
     # Jm_array = torch.vstack([torch.tensor([nCP[fn_lev]+np.ravel_multi_index(supp, fn_sh[fn_lev]) for fn_lev, supp in ac_cells_ac_supp[cell_lev][cellIdx]] for cell_lev, cellIdx in ac_spans)]).to(device=device)
 
     return ctrl_pts, Jm, PHI, num_supp_cumsum, device

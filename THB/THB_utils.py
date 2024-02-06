@@ -95,7 +95,7 @@ def plot3DGrid(cells, knotvectors):
 
     grid.save('unstructured_grid.vtu')
 
-    _ = grid.plot(show_edges=True)
+    # _ = grid.plot(show_edges=True)
 
 
 def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees):
