@@ -219,4 +219,4 @@ def plot3DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
 
     grid.save('unstructured_grid.vtu')
 
-    _ = grid.plot(show_edges=True)
+    # _ = grid.plot(show_edges=True)
