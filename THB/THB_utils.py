@@ -48,8 +48,7 @@ def plot2DGrid(ax, cells, knotvectors, show_fig=True):
     ax.set_box_aspect(1)
     ax.set_axis_off()
     plt.margins(0)
-    # plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
-    #         hspace = 0, wspace = 0)
+    
     if show_fig:
         plt.show()
     
@@ -88,16 +87,10 @@ def plot3DGrid(cells, knotvectors):
     corners = np.vstack(corners)
     unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
 
-    # hexa_cells = np.hstack(([8], inverse_indices.reshape(-1, 8).T.flatten()))
-
     cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
 
-    
-    # grid.points = unique_points
-    # cell_types = np.full(num_corners, pv.CellType.HEXAHEDRON)
-    cells = [np.concatenate([np.array([8]), inverse_indices[8*i:8*i+8]], dtype=np.int_) for i in range(num_cells)]
-    cells = np.vstack(cells, dtype=np.int_).ravel()
-    # cells = np.hstack((np.full((len(corners), 1), 8, dtype=np.int_), inverse_indices.reshape(-1, 8))).flatten()
+    cells = np.vstack([np.concatenate([np.array([8]), inverse_indices[8*i:8*i+8]], dtype=np.int_) for i in range(num_cells)], dtype=np.int_).ravel()
+
     grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
     grid.save('unstructured_grid.vtu')
@@ -218,16 +211,10 @@ def plot3DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
     corners = np.vstack(corners)
     unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
 
-    # hexa_cells = np.hstack(([8], inverse_indices.reshape(-1, 8).T.flatten()))
-
     cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
 
-    
-    # grid.points = unique_points
-    # cell_types = np.full(num_corners, pv.CellType.HEXAHEDRON)
     cells = [np.concatenate([np.array([8]), inverse_indices[8*i:8*i+8]], dtype=np.int_) for i in range(num_cells)]
     cells = np.vstack(cells, dtype=np.int_).ravel()
-    # cells = np.hstack((np.full((len(corners), 1), 8, dtype=np.int_), inverse_indices.reshape(-1, 8))).flatten()
     grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
     grid.save('unstructured_grid.vtu')

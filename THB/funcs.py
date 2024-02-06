@@ -40,12 +40,6 @@ def compute_tensor_product(args):
         return np.einsum('i, j -> ij', *args)
     if len(args)==3:
         return np.einsum('i, j, k -> ijk', *args, optimize=True)
-    
-# def tensor_product_2D(X, Y):
-#     return np.einsum("i, j -> ij", X, Y)
-
-# def tensor_product_3D(X, Y, Z):
-#     return np.einsum("i, j, k -> ijk", X, Y, Z)
 
 def findSpan(n, p, u, U):
     if u==U[n+1]:

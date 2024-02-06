@@ -4,28 +4,8 @@ from funcs import compute_coeff_tensor_product, compute_projection, compute_tens
 from copy import deepcopy
 from tqdm import tqdm
 import torch
-import THB_eval
 from multiprocessing import Pool
 
-class THBEval(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum, device):
-        ctx.save_for_backward(ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
-        ctx.device = device
-        if device=='cuda':
-            return THB_eval.forward(ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
-        else:
-            return THB_eval.cpp_forward(ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum = ctx.saved_tensors
-        device = ctx.device
-        if device=='cuda':
-            grad_ctrl_pts = THB_eval.backward(grad_output, ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
-        else:
-            grad_ctrl_pts = THB_eval.cpp_backward(grad_output, ctrl_pts, Jm_array, tensor_prod, num_supp_bs_cumsum)
-        return grad_ctrl_pts, None, None, None, None
 
 def compute_active_cells_active_supp(cells, fns, degrees):
     max_lev = max(cells.keys())
@@ -86,7 +66,7 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
         cell_supp = ac_cells_supp[cell_lev][cellIdx]
         max_lev_cellIdx = [findSpan(fn_shapes[max_lev][dim], degrees[dim], g[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
         basis_fns = [basisFun(max_lev_cellIdx[dim], g[dim], degrees[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
-        all_fn_values = []
+        # all_fn_values = []
         num_supp_cumsum.append(num_supp_cumsum[i]+len(cell_supp))
         for fn in cell_supp:
             fn_lev, fnIdx = fn
@@ -94,10 +74,10 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
             sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
             fn_tp = compute_tensor_product(basis_fns)
             fn_value = np.sum(sub_coeff*fn_tp)
-            all_fn_values.append(fn_value)
-        PHI.append(np.array(all_fn_values))
+            # all_fn_values.append(fn_value)
+            PHI.append(fn_value)
 
-    return PHI, num_supp_cumsum
+    return np.array(PHI), np.array(num_supp_cumsum)
 
 def evaluate(PHI, ctrl_pts, ac_spans, num_supp_cumsum, ac_cells_ac_supp):
     output = np.zeros((len(PHI), ctrl_pts[0].shape[-1]))
