@@ -161,7 +161,7 @@ def worker(param_idx, param, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knot
         fn_value = np.sum(sub_coeff*fn_tp)
         all_fn_values.append(fn_value)
         num_supp += len(cell_supp)
-    return np.array(all_fn_values), num_supp
+    return all_fn_values, num_supp
 
 def compute_basis_fns_tp_parallel(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees):
     with Pool(processes=10) as pool:    
@@ -169,9 +169,10 @@ def compute_basis_fns_tp_parallel(params, ac_spans, ac_cells_supp, fn_coeffs, fn
         
         results = pool.starmap(worker, tasks)
         
-        PHI = [result[0] for result in results]
+        PHI = []
         num_supp_cumsum = [0]
         for result in results:
+            PHI += result[0]
             num_supp_cumsum.append(num_supp_cumsum[-1] + result[1])
             
-    return PHI, num_supp_cumsum
+    return np.array(PHI), np.array(num_supp_cumsum)
