@@ -1,5 +1,5 @@
 import numpy as np
-from funcs import *
+from THB.funcs import *
 from copy import deepcopy
 
 class BSpline:

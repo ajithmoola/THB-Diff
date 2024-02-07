@@ -1,9 +1,8 @@
 import numpy as np
 from itertools import product
-from funcs import compute_coeff_tensor_product, compute_projection, compute_tensor_product, findSpan, basisFun, assemble_Tmatrix
+from THB.funcs import compute_coeff_tensor_product, compute_projection, compute_tensor_product, findSpan, basisFun, assemble_Tmatrix
 from copy import deepcopy
 from tqdm import tqdm
-import torch
 from multiprocessing import Pool
 
 

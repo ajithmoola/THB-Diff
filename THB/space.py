@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
-from funcs import assemble_Tmatrix
-from THB_core import get_children_fns, support_cells_multi
+from THB.funcs import assemble_Tmatrix
+from THB.THB_core import get_children_fns, support_cells_multi
 
 class Space:
 

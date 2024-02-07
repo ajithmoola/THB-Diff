@@ -56,17 +56,6 @@ def findSpan(n, p, u, U):
     return mid
 
 def basisFun(i, u, p, U):
-    """computes basis functions required to evaluate a point on the b-spline
-
-    Args:
-        i (int): knot span index
-        u (float): parametric coordinate
-        p (int): degree of the b-spline
-        U (ndarray): knot vector
-
-    Returns:
-        ndarray: returns basis functions required to compute a point on the b-spline
-    """
     N = np.zeros((p+1))
     N[0] = 1
     left = np.zeros((p+1))

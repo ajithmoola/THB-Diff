@@ -37,6 +37,5 @@ def prepare_data_for_acceleration(PHI, ac_spans, num_supp_cumsum, ctrl_pts, ac_c
     Jm = [nCP[fn_lev] + np.ravel_multi_index(fnIdx, fn_sh[fn_lev]) for cell_lev, cellIdx in ac_spans for fn_lev, fnIdx in ac_cells_ac_supp[cell_lev][cellIdx]]
 
     Jm = torch.tensor(Jm).to(device)
-    # Jm_array = torch.vstack([torch.tensor([nCP[fn_lev]+np.ravel_multi_index(supp, fn_sh[fn_lev]) for fn_lev, supp in ac_cells_ac_supp[cell_lev][cellIdx]] for cell_lev, cellIdx in ac_spans)]).to(device=device)
 
     return ctrl_pts, Jm, PHI, num_supp_cumsum, device

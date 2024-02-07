@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from funcs import *
+from THB.funcs import *
 import pyvista as pv
 
 
