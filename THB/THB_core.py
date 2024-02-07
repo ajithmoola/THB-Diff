@@ -60,6 +60,7 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
     ndim = len(degrees)
     PHI = []
     num_supp_cumsum = [0]
+    num_supp = []
     for i, g in enumerate(tqdm(params)):
         cell_lev, cellIdx = ac_spans[i]
         cell_supp = ac_cells_supp[cell_lev][cellIdx]
@@ -67,6 +68,7 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
         basis_fns = [basisFun(max_lev_cellIdx[dim], g[dim], degrees[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
         # all_fn_values = []
         num_supp_cumsum.append(num_supp_cumsum[i]+len(cell_supp))
+        num_supp.append(len(cell_supp))
         for fn in cell_supp:
             fn_lev, fnIdx = fn
             slice_tuple = tuple(slice(max_lev_cellIdx[dim]-degrees[dim], max_lev_cellIdx[dim]+1) for dim in range(ndim))
@@ -76,7 +78,7 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
             # all_fn_values.append(fn_value)
             PHI.append(fn_value)
 
-    return np.array(PHI), np.array(num_supp_cumsum)
+    return np.array(PHI), np.array(num_supp_cumsum), np.array(num_supp)
 
 def evaluate(PHI, ctrl_pts, ac_spans, num_supp_cumsum, ac_cells_ac_supp):
     output = np.zeros((len(PHI), ctrl_pts[0].shape[-1]))
@@ -152,7 +154,7 @@ def worker(param_idx, param, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knot
     max_lev_cellIdx = [findSpan(fn_shapes[max_lev][dim], degrees[dim], param[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
     basis_fns = [basisFun(max_lev_cellIdx[dim], param[dim], degrees[dim], knotvectors[max_lev][dim]) for dim in range(ndim)]
     all_fn_values = []
-    num_supp = 0
+    num_supp = len(cell_supp)
     for fn in cell_supp:
         fn_lev, fnIdx = fn
         slice_tuple = tuple(slice(max_lev_cellIdx[dim]-degrees[dim], max_lev_cellIdx[dim]+1) for dim in range(ndim))
@@ -160,7 +162,6 @@ def worker(param_idx, param, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knot
         fn_tp = compute_tensor_product(basis_fns)
         fn_value = np.sum(sub_coeff*fn_tp)
         all_fn_values.append(fn_value)
-        num_supp += len(cell_supp)
     return all_fn_values, num_supp
 
 def compute_basis_fns_tp_parallel(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees):
@@ -170,9 +171,9 @@ def compute_basis_fns_tp_parallel(params, ac_spans, ac_cells_supp, fn_coeffs, fn
         results = pool.starmap(worker, tasks)
         
         PHI = []
-        num_supp_cumsum = [0]
+        num_supp = []
         for result in results:
             PHI += result[0]
-            num_supp_cumsum.append(num_supp_cumsum[-1] + result[1])
+            num_supp.append(result[1])
             
-    return np.array(PHI), np.array(num_supp_cumsum)
+    return np.array(PHI), np.array(num_supp)
