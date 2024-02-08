@@ -104,8 +104,6 @@ def plot3DGrid(cells, knotvectors):
 
     grid.save('unstructured_grid.vtu')
 
-    # _ = grid.plot(show_edges=True)
-
 
 def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees):
     fig, ax = plt.subplots()
@@ -227,5 +225,3 @@ def plot3DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
     grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
     grid.save('unstructured_grid.vtu')
-
-    # _ = grid.plot(show_edges=True)
