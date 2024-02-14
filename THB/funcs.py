@@ -40,6 +40,13 @@ def compute_tensor_product(args):
         return np.einsum('i, j -> ij', *args)
     if len(args)==3:
         return np.einsum('i, j, k -> ijk', *args, optimize=True)
+    
+def compute_bezier_projection(args, ndim):
+    if ndim==2:
+        return np.einsum('ij, ijkl -> kl', *args, optimize=True)
+    elif ndim==3:
+        return np.einsum('ijk, ijklmn -> lmn', *args, optimize=True)
+
 
 def findSpan(n, p, u, U):
     if u==U[n+1]:
@@ -95,3 +102,53 @@ def assemble_Tmatrix(knotVec, newKnotVec, knotVec_len, newKnotVec_len, p):
             
         T1 = T2
     return T1
+
+def bezier_extraction(knot, p):
+    m  = len(knot)-p-1
+    a  = p+1
+    b  = a+1
+    ne = 0
+    C = []
+    C.append(np.eye(p+1,p+1))
+    alphas = {}
+    
+    while b <= m:
+        C.append(np.eye(p+1,p+1))
+        i=b
+        while b <= m and knot[b] == knot[b-1]:
+            b=b+1
+            
+        multiplicity = b-i+1
+        if multiplicity < p:
+            numerator = (knot[b-1]-knot[a-1])
+            for j in range(p,multiplicity,-1):
+                alphas[j-multiplicity]=numerator/(knot[a+j-1]-knot[a-1])
+
+            r=p-multiplicity
+            for j in range(1,r+1):
+                save = r-j+1
+                s = multiplicity + j
+                for k in range(p+1,s,-1):
+                    alpha=alphas[k-s]
+                    C[ne][:,k-1]= alpha*C[ne][:,k-1] + (1-alpha)*C[ne][:,k-2]
+                if b <= m:
+                    C[ne+1][save-1:save+j, save-1] = C[ne][p-j:p+1, p]
+            ne=ne+1
+            if b <= m:
+                a=b
+                b=b+1
+
+        elif multiplicity == p:
+            if b <= m:
+                ne=ne+1
+                a=b
+                b=b+1
+    return C
+
+
+if __name__=='__main__':
+    kv = np.array([0, 0, 0, 0, 1, 2, 3, 4, 4, 4, 4])
+    deg = 3
+    num_knots = len(np.unique(kv))
+    C, nb = bezier_extraction(kv, deg)
+    print(C, nb, num_knots)

@@ -1,7 +1,7 @@
 import torch
 import THB_eval
 import numpy as np
-from THB.THB_utils import timer
+from THB.utils import timer
 
 class THBEval(torch.autograd.Function):
     @timer
@@ -65,7 +65,6 @@ def prepare_data_for_evaluation(PHI, ac_spans, num_supp, ctrl_pts, ac_cells_ac_s
 
     return ctrl_pts, Jm, PHI, segment_ids, num_pts
 
-@timer
 @torch.compile
-def Evaluate(ctrl_pts, Jm, PHI, segment_ids, num_pts):
-    return torch.zeros((num_pts, 3)).to(device='cuda').scatter_add_(0, segment_ids, ctrl_pts[Jm] * PHI)
+def Evaluate(ctrl_pts, Jm, PHI, segment_ids, num_pts, device):
+    return torch.zeros((num_pts, 3)).to(device=device).scatter_add_(0, segment_ids, ctrl_pts[Jm] * PHI)
