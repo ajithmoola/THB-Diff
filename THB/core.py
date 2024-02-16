@@ -131,7 +131,7 @@ def compute_basis_fns_tp(params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, 
             fn_value = np.sum(sub_coeff*fn_tp)
             PHI.append(fn_value)
 
-    return np.array(PHI), np.array(num_supp_cumsum), np.array(num_supp)
+    return np.array(PHI), np.array(num_supp_cumsum)
 
 
 def compute_multilevel_bezier_extraction_operators(params, ac_spans, ac_cells_supp, fn_coeffs, cell_shapes, fn_shapes, knotvectors, degrees):
@@ -148,7 +148,7 @@ def compute_multilevel_bezier_extraction_operators(params, ac_spans, ac_cells_su
         degrees (list): List of degrees for each dimension.
 
     Returns:
-        None
+        (list): List of beizer extraction operators
     """
     max_lev = max(knotvectors.keys())
     ndim = len(degrees)

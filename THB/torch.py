@@ -3,6 +3,17 @@ import THB_eval
 import numpy as np
 from THB.utils import timer
 
+class THB_nn_module(torch.nn.Module):
+    def __init__(self, Jm, PHI, num_supp_cumsum, device):
+        super(THB_nn_module, self).__init__()
+        self.Jm = Jm
+        self.PHI = PHI
+        self.num_supp_cumsum = num_supp_cumsum
+        self.device = device
+    
+    def forward(self, ctrl_pts):
+        return THBEval.apply(ctrl_pts, self.Jm, self.PHI, self.num_supp_cumsum, self.device)
+
 class THBEval(torch.autograd.Function):
     @timer
     @staticmethod
@@ -28,13 +39,13 @@ class THBEval(torch.autograd.Function):
 def prepare_data_for_CUDA_evaluation(PHI, ac_spans, num_supp, ctrl_pts, ac_cells_ac_supp, fn_sh, device):
     max_lev = max(ctrl_pts.keys())
     nCP = np.zeros(max_lev+2, dtype=np.int_)
-    num_supp_cumsum = torch.from_numpy(np.concatenate([np.array([0]), num_supp]).cumsum()).to(device=device)
+    num_supp_cumsum = torch.from_numpy(num_supp).cumsum(0).to(device=device)
     PHI = torch.from_numpy(PHI).float().to(device=device)
     CP_dim = ctrl_pts[0].shape[-1]
     for lev in range(1, max_lev+2):
         nCP[lev] = nCP[lev-1] + np.prod(fn_sh[lev-1])
     
-    ctrl_pts = torch.vstack([torch.from_numpy(ctrl_pts[lev]).reshape(-1, CP_dim).float() for lev in range(max_lev+1)]).to(device=device)
+    ctrl_pts = torch.vstack([torch.from_numpy(ctrl_pts[lev]).reshape(-1, CP_dim).float() for lev in range(max_lev+1)]).float().to(device=device)
     
     Jm = [nCP[fn_lev] + np.ravel_multi_index(fnIdx, fn_sh[fn_lev]) for cell_lev, cellIdx in ac_spans for fn_lev, fnIdx in ac_cells_ac_supp[cell_lev][cellIdx]]
 

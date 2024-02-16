@@ -27,5 +27,6 @@ def prepare_data_for_evaluation_jax(PHI, ac_spans, num_supp, ctrl_pts, ac_cells_
     return ctrl_pts, Jm, PHI, segment_ids, num_pts
 
 def Evaluate_JAX(ctrl_pts, Jm, PHI, segment_ids, num_pts):
-    output = jnp.zeros((num_pts, 3)).at[segment_ids].add(ctrl_pts[Jm] * PHI)
+    prod = PHI * ctrl_pts[Jm]
+    output = jnp.zeros((num_pts, 3)).at[segment_ids].add(prod)
     return output

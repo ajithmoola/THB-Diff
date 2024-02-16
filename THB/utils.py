@@ -24,7 +24,6 @@ class THB_plot:
     def add_3Daxis(self, axis_name):
         ax = self.fig.add_subplot(projection='3d')
         self.ax[axis_name] = ax
-        return ax
     
     def add_2Daxis(self, axis_name):
         ax = self.fig.add_subplot()
@@ -34,6 +33,16 @@ class THB_plot:
         self.fig.savefig(self.dir+'/'+self.figname+'.pdf', dpi=dpi, bbox_inches='tight',
                          pad_inches=0, transparent=True, format='pdf')
 
+    def plot_3D_wireframe_surface(self, axisname, xyz, shape, linestyle='solid', linewidth=1, color='green'):
+        ax = self.ax[axisname]
+        xyz = xyz.reshape(*shape, 3)
+        ax.plot_wireframe(xyz[:,:,0], xyz[:,:,1], xyz[:,:,2], linestyle=linestyle, linewidth=linewidth, color=color)
+        ax.set_axis_off()
+        ax.grid(False)
+        plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+            hspace = 0, wspace = 0)
+        plt.margins(0)
+        
 
 def plot2DGrid(ax, cells, knotvectors, show_fig=True):
 
