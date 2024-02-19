@@ -3,7 +3,7 @@ from itertools import product
 from THB.funcs import *
 from copy import deepcopy
 from tqdm import tqdm
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 
 def compute_active_cells_active_supp(cells, fns, degrees):
@@ -460,7 +460,7 @@ def compute_basis_fns_tp_parallel(
         numpy.ndarray: Array of basis function values.
         numpy.ndarray: Array of number of supports for each parameter.
     """
-    with Pool(processes=10) as pool:
+    with Pool(processes=cpu_count()) as pool:
         tasks = [
             (i, g, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees)
             for i, g in enumerate(params)
