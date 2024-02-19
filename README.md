@@ -5,3 +5,12 @@
 Finished the important parts but lacks comments and documentation. The repository is still a work in progress.
 
 The paper can be accessed [here](https://rdcu.be/dyLQl).
+
+Citation
+```
+@Article{thbdiff,
+author={Moola, Ajith and Balu, Aditya and Krishnamurthy, Adarsh and Pawar, Aishwarya},
+title={THB-Diff: a GPU-accelerated differentiable programming framework for THB-splines},
+journal={Engineering with Computers},
+year={2023},}
+```
