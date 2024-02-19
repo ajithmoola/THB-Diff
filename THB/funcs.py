@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit
-
+import jax.numpy as jnp
+from jax import jit
 
 def refine_knotvector(knotvector, p):
     knots = np.unique(knotvector)
@@ -61,6 +62,16 @@ def findSpan(n, p, u, U):
             low = mid
         mid = int((low+high)/2)
     return mid
+
+@jit
+def find_span_vectorized_jax(param, U):
+    n = len(U) - 2
+    
+    indices = jnp.searchsorted(U, param, side='right') - 1
+    
+    indices = jnp.where(indices > n, n, indices)
+    
+    return indices
 
 def basisFun(i, u, p, U):
     N = np.zeros((p+1))
