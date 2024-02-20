@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
 from THB.funcs import assemble_Tmatrix
-from THB.core import get_children_fns, support_cells_multi
+from THB.core import *
 
 
 class Space:
@@ -90,6 +90,31 @@ class Space:
                 H[lev + 1][idx] = 1
 
         self.fns = H
+
+    def compute_coefficients(self):
+        self.ac_cells = compute_active_cells_active_supp(
+            self.cells, self.fns, self.degrees
+        )
+        self.fn_coeffs = compute_refinement_operators(
+            self.fns, self.Coeff, self.degrees
+        )
+
+    def set_parameters(self, parameters):
+        self.parameters = parameters
+
+    def compute_tensor_product(self):
+        self.ac_spans = compute_active_span(
+            self.parameters, self.knotvectors, self.cells, self.degrees, self.sh_fns
+        )
+        self.PHI, self.num_supp = compute_basis_fns_tp_parallel(
+            self.parameters,
+            self.ac_spans,
+            self.ac_cells,
+            self.fn_coeffs,
+            self.sh_fns,
+            self.knotvectors,
+            self.degrees,
+        )
 
     def refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1
