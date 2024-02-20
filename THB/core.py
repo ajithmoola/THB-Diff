@@ -4,9 +4,12 @@ from THB.funcs import *
 from copy import deepcopy
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
+from typing import Dict, Tuple, List, Union
 
 
-def compute_active_cells_active_supp(cells, fns, degrees):
+def compute_active_cells_active_supp(
+    cells: Dict[int, np.ndarray], fns: Dict[int, np.ndarray], degrees: Tuple[int]
+) -> Dict[int, Dict[Tuple[int], np.ndarray]]:
     """
     Compute the active cells and their active supports.
 
@@ -33,7 +36,11 @@ def compute_active_cells_active_supp(cells, fns, degrees):
     return ac_cells
 
 
-def compute_refinement_operators(fns, coeffs, degrees):
+def compute_refinement_operators(
+    fns: Dict[int, np.ndarray],
+    coeffs: Dict[int, Dict[int, np.ndarray]],
+    degrees: Tuple[int],
+) -> Dict[int, np.ndarray]:
     """
     Compute the projection matrices for the basis functions.
 
@@ -80,7 +87,13 @@ def compute_refinement_operators(fns, coeffs, degrees):
     return fn_coeffs
 
 
-def compute_active_span(params, knotvectors, cells, degrees, fn_shapes):
+def compute_active_span(
+    params: np.ndarray,
+    knotvectors: Dict[int, Dict[int, np.ndarray]],
+    cells: Dict[int, np.ndarray],
+    degrees: Tuple[int],
+    fn_shapes: Dict[int, Tuple[int]],
+) -> List[Tuple[int]]:
     """
     Compute the active spans for given parameters.
 
@@ -120,8 +133,14 @@ def compute_active_span(params, knotvectors, cells, degrees, fn_shapes):
 
 
 def compute_basis_fns_tp(
-    params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
-):
+    params: np.ndarray,
+    ac_spans: List[Tuple[int]],
+    ac_cells_supp: Dict[int, Dict[Tuple[int], List[Tuple[int]]]],
+    fn_coeffs: Dict[int, np.ndarray],
+    fn_shapes: Dict[int, Tuple[int]],
+    knotvectors: Dict[int, Dict[int, np.ndarray]],
+    degrees: Tuple[int],
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute the basis function tensor product for given parameters.
 
@@ -184,15 +203,15 @@ def compute_basis_fns_tp(
 
 
 def compute_multilevel_bezier_extraction_operators(
-    params,
-    ac_spans,
-    ac_cells_supp,
-    fn_coeffs,
-    cell_shapes,
-    fn_shapes,
-    knotvectors,
-    degrees,
-):
+    params: List[List[float]],
+    ac_spans: List[Tuple[int]],
+    ac_cells_supp: Dict[int, Dict[Tuple[int], List[Tuple[int]]]],
+    fn_coeffs: Dict[int, Dict[int, np.ndarray]],
+    cell_shapes: Dict[int, Tuple[int]],
+    fn_shapes: Dict[int, Tuple[int]],
+    knotvectors: Dict[int, Dict[int, np.ndarray]],
+    degrees: Tuple[int],
+) -> List[np.ndarray]:
     """
     Compute the multilevel Bezier extraction operators.
 
@@ -258,7 +277,9 @@ def compute_multilevel_bezier_extraction_operators(
     return C
 
 
-def get_children_fns(fnIdx, Coeff, level, dims):
+def get_children_fns(
+    fnIdx: Tuple[int], Coeff: Dict[int, Dict[int, np.ndarray]], level: int, dims: int
+) -> List[Tuple[int]]:
     """
     Get the children basis functions for a given basis function.
 
@@ -283,13 +304,13 @@ def get_children_fns(fnIdx, Coeff, level, dims):
     return [tuple(row) for row in combinations]
 
 
-def get_supp_fns(cellIdx, degrees):
+def get_supp_fns(cellIdx: Tuple[int], degrees: Tuple[int]) -> List[Tuple[int]]:
     """
     Get the support basis functions for a given cell.
 
     Args:
         cellIdx (tuple): Index of the cell.
-        degrees (list): List of degrees for each dimension.
+        degrees (tuple): Tuple of degrees for each dimension.
 
     Returns:
         list: List of support basis functions.
@@ -298,7 +319,12 @@ def get_supp_fns(cellIdx, degrees):
     return [basisIdx for basisIdx in product(*ranges)]
 
 
-def _compute_cell_active_supp(cellIdx, curr_level, fns, degrees):
+def _compute_cell_active_supp(
+    cellIdx: Tuple[int],
+    curr_level: int,
+    fns: Dict[int, np.ndarray],
+    degrees: Tuple[int],
+) -> List[Tuple[int]]:
     """
     Compute the active supports for a given cell.
 
@@ -321,14 +347,16 @@ def _compute_cell_active_supp(cellIdx, curr_level, fns, degrees):
     return ac_supp
 
 
-def support_cells_multi(knot_vectors, degrees, fn):
+def support_cells_multi(
+    knot_vectors: Dict[int, np.ndarray], degrees: Tuple[int], fn: Tuple[int]
+) -> List[Tuple[int]]:
     """
     Compute the support cells for a given function.
 
     Args:
-        knot_vectors (list): List of knot vectors for each dimension.
-        degrees (list): List of degrees for each dimension.
-        fn (list): List of indices for each dimension.
+        knot_vectors (Dict): Dictionary of knot vectors for each dimension.
+        degrees (tuple): Tuple of degrees for each dimension.
+        fn (tuple): Tuple of indices for each dimension.
 
     Returns:
         list: List of support cells for the given function.
@@ -351,13 +379,15 @@ def support_cells_multi(knot_vectors, degrees, fn):
     return [tuple(cell) for cell in support_cells_md]
 
 
-def compute_subdivision_coefficients(knotvectors, degrees):
+def compute_subdivision_coefficients(
+    knotvectors: Dict[int, Dict[int, np.ndarray]], degrees: Tuple[int]
+) -> Dict[int, Dict[int, np.ndarray]]:
     """
     Compute the subdivision coefficients.
 
     Args:
         knotvectors (dict): Dictionary containing the knot vectors at each level.
-        degrees (list): List of degrees for each dimension.
+        degrees (tuple): Tuple of degrees for each dimension.
 
     Returns:
         dict: Dictionary containing the subdivision coefficients.
@@ -448,7 +478,7 @@ def compute_basis_fns_tp_parallel(
     Compute the basis function tensor product in parallel.
 
     Args:
-        params (list): List of parameter values.
+        params (ndarray): List of parameter values.
         ac_spans (list): List of active spans.
         ac_cells_supp (dict): Dictionary containing the active cells and their supports at each level.
         fn_coeffs (dict): Dictionary containing the coefficients of basis functions at each level.
