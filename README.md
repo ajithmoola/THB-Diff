@@ -12,9 +12,9 @@ The paper can be accessed [here](https://rdcu.be/dyLQl).
 
 - Create a conda environment
 
-```
-conda create -n THB python=3.10
-```
+    ```
+    conda create -n THB python=3.10
+    ```
 
 - Install the following dependencies using either ```pip``` or ```conda```
     - numPy
@@ -31,22 +31,22 @@ conda create -n THB python=3.10
 
     Replace jax and jaxlib with pytorch if a pytorch version is preferred.
 
-- To access CUDA-accelerated kernels or c++ functions for THB-spline evaluation, run the following command from the THB_extensions directory.
+- To access CUDA-accelerated kernels or c++ functions for THB-spline evaluation using PyTorch, run the following command from the THB_extensions directory.
 
-```
-python setup.py build
-python setup.py install
-```
+    ```
+    python setup.py build
+    python setup.py install
+    ```
 
 - Install source code THB-Diff
 
-```
-pip install .
-```
-for editable installtion
-```
-pip install -e .
-```
+    ```
+    pip install .
+    ```
+    for editable installtion
+    ```
+    pip install -e .
+    ```
 
 ## Citation
 ```
