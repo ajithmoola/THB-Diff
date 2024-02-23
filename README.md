@@ -10,6 +10,12 @@ The paper can be accessed [here](https://rdcu.be/dyLQl).
 
 - Install conda (Follow the instructions on this [webpage](https://docs.anaconda.com/free/miniconda/miniconda-install/)). Although, for MacOS it would be easier to install conda using Homebrew.
 
+- Activate the conda environment.
+
+  ```
+  conda activate THB
+  ```
+
 - Create a conda environment
 
     ```
@@ -17,13 +23,14 @@ The paper can be accessed [here](https://rdcu.be/dyLQl).
     ```
 
 - Install the following dependencies using either ```pip``` or ```conda```
-    - numPy
+    - numpy
     - matplotlib
     - jax
     - jaxlib
     - tqdm
     - numba
     - pyvista
+
 
     ```
     pip install jax jaxlib numba matplotlib tqdm numba pyvista
