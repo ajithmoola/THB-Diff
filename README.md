@@ -10,17 +10,17 @@ The paper can be accessed [here](https://rdcu.be/dyLQl).
 
 - Install conda (Follow the instructions on this [webpage](https://docs.anaconda.com/free/miniconda/miniconda-install/)). Although, for MacOS it would be easier to install conda using Homebrew.
 
-- Activate the conda environment.
-
-  ```
-  conda activate THB
-  ```
-
 - Create a conda environment
 
     ```
     conda create -n THB python=3.10
     ```
+
+- Activate the conda environment.
+
+  ```
+  conda activate THB
+  ```
 
 - Install the following dependencies using either ```pip``` or ```conda```
     - numpy
