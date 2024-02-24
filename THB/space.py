@@ -91,7 +91,7 @@ class Space:
 
         self.fns = H
 
-    def compute_coefficients(self):
+    def compute_refinement_operators(self):
         self.ac_cells = compute_active_cells_active_supp(
             self.cells, self.fns, self.degrees
         )
