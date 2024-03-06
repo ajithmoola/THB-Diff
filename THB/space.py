@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
 from THB.funcs import assemble_Tmatrix
-from THB.core import *
+from THB.core import get_children_fns, support_cells_multi
 
 
 class Space:
@@ -91,36 +91,15 @@ class Space:
 
         self.fns = H
 
-    def compute_refinement_operators(self):
-        self.ac_cells = compute_active_cells_active_supp(
-            self.cells, self.fns, self.degrees
-        )
-        self.fn_coeffs = compute_refinement_operators(
-            self.fns, self.Coeff, self.degrees
-        )
-
-    def set_parameters(self, parameters):
-        self.parameters = parameters
-
-    def compute_tensor_product(self):
-        self.ac_spans = compute_active_span(
-            self.parameters, self.knotvectors, self.cells, self.degrees, self.sh_fns
-        )
-        self.PHI, self.num_supp = compute_basis_fns_tp_parallel(
-            self.parameters,
-            self.ac_spans,
-            self.ac_cells,
-            self.fn_coeffs,
-            self.sh_fns,
-            self.knotvectors,
-            self.degrees,
-        )
-
     def refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1
         supp_cells = self.get_support_cell_indices(fnIdx, level)
         for cell in supp_cells:
             self._refine_cell(cell, level)
+
+    def refine_cells(self, list_of_cells):
+        for lev, cell in list_of_cells:
+            self._refine_cell(cell, lev)
 
     def _refine_cell(self, cellIdx, level):
         self.cells[level][cellIdx] = 0
@@ -131,6 +110,17 @@ class Space:
             )
         for child in children_cells:
             self.cells[level + 1][child] = 1
+
+    def _collapse_cell(self, cellIdx, level):
+        ancestor_cell = tuple(np.array(cellIdx) // 2)
+        self.cells[level - 1][cellIdx] = 1
+        children_cells = []
+        for offset in product(range(2), repeat=len(ancestor_cell)):
+            children_cells.append(
+                tuple(2 * index + delta for index, delta in zip(ancestor_cell, offset))
+            )
+        for child in children_cells:
+            self.cells[level][child] = 0
 
     def get_support_cell_indices(self, fnIdx, level):
         return support_cells_multi(self.knotvectors[level], self.degrees, fnIdx)
