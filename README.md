@@ -55,6 +55,42 @@ The paper can be accessed [here](https://rdcu.be/dyLQl).
     pip install -e .
     ```
 
+## Example Usage
+
+Create B-spline objects which constitute the initial tensor-product
+
+For 2D THB-splines
+
+```
+from THB.datastructures import BSpline, TensorProduct
+
+bs1 = BSpline(knotvector=np.array([0, 0, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1, 1]), degree=2)
+bs2 = BSpline(knotvector=np.array([0, 0, 0, 0, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 1, 1, 1, 1], degree=3)
+
+tp_2D = TensorProduct([bs1, bs2])
+```
+
+For 3D THB-splines
+
+```
+from THB.datastructures import BSpline, TensorProduct
+
+bs1 = BSpline(knotvector=np.array([0, 0, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1, 1]), degree=2)
+bs2 = BSpline(knotvector=np.array([0, 0, 0, 0, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 1, 1, 1, 1], degree=3)
+bs3 = BSpline(knotvector=np.array([0, 0, 0, 0.2, 0.4, 0.6, 0.8, 1, 1, 1]), degree=2)
+
+tp_3D = TensorProduct([bs1, bs2, bs3])
+```
+THB-Diff supports non-uniformly spaced knots as input knotvectors for constituent ```BSplines```. The ```TensorProduct``` can have ```BSplines``` objects of varied degrees and knotvectors as input for tensor-product construction.
+
+Create a ```Space``` object which handles the low-level queries and operations on THB-spline domain and function space, and a ```THB``` object to handle high-level operations, GPU-accelerated THB-spline evaluation methods, loss functions, gradient computation and other utilites.
+
+```
+h_space = Space(tensor_product=tp, num_levels=3)
+THB = THB_layer(h_space)
+```
+
+
 ## Citation
 ```
 @Article{thbdiff,
