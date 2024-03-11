@@ -90,6 +90,7 @@ h_space = Space(tensor_product=tp, num_levels=3)
 THB = THB_layer(h_space)
 ```
 
+_documentation work in progress..._
 
 ## Citation
 ```
