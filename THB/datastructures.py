@@ -1,5 +1,5 @@
 import numpy as np
-from THB.funcs import *
+from THB.funcs import refine_knotvector, compute_tensor_product
 from copy import deepcopy
 
 
@@ -26,16 +26,27 @@ class TensorProduct:
 
 class ControlPoints:
     def __init__(self, H_space):
-        self.H = H_space.H
-        self.num_levels = H_space.num_levels
+        self.h_space = H_space
+        self.max_lev = H_space.num_levels - 1
         self.ndim = H_space.ndim
         self.CP_status = {
-            lev: np.zeros_like(H_space.fns[lev]) for lev in range(H_space.num_levels)
+            lev: np.zeros_like(H_space.fns[lev]) for lev in range(self.max_lev + 1)
         }
         self.CP_status[0] = np.ones_like(self.CP_status[0])
 
-    def update_CP(self, ctrl_pts, fns, Coeffs):
-        for lev in range(1, self.num_levels):
+    def update_CP(self, CP_arr, fns, Coeffs):
+        CP_arr = np.array(CP_arr)
+        nCP = [0] + [
+            np.prod(self.h_space.sh_fns[lev]) for lev in range(self.max_lev + 1)
+        ]
+        ctrl_pts = {
+            lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(
+                *self.h_space.sh_fns[lev], self.ndim
+            )
+            for lev in range(self.max_lev + 1)
+        }
+
+        for lev in range(1, self.max_lev + 1):
             curr_coeff = Coeffs[lev - 1]
             for CP in np.ndindex(fns[lev].shape):
                 if self.CP_status[lev][CP] == 0 and fns[lev][CP] == 1:

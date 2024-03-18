@@ -1,6 +1,7 @@
 from jax import value_and_grad, grad, jit
 import jax.numpy as jnp
 from THB.core import *
+from THB.funcs import grevilleAbscissae
 from THB.jax import *
 
 
@@ -8,6 +9,61 @@ class THB_layer:
 
     def __init__(self, h_space):
         self.h_space = h_space
+
+    def initialize_control_points(self):
+        self.GA = {
+            lev: np.zeros((*self.h_space.sh_fns[lev], self.h_space.ndim))
+            for lev in range(self.h_space.num_levels)
+        }
+        self.GA[0] = grevilleAbscissae(
+            self.h_space.sh_fns[0], self.h_space.degrees, self.h_space.knotvectors[0]
+        )
+        self.CP_status = {
+            lev: np.zeros_like(self.h_space.fns[lev])
+            for lev in range(self.h_space.num_levels)
+        }
+        self.CP_status[0] = np.ones_like(self.CP_status[0])
+
+    def update_GA(self):
+        self.GA = self.refine_ctrl_pts(self.GA)
+
+    def update_ctrl_pts(self, CP_arr):
+        if type(CP_arr) == dict:
+            new_ctrl_pts = CP_arr
+        else:
+            CP_arr = np.array(CP_arr)
+            nCP = [0] + [
+                np.prod(
+                    self.h_space.sh_fns[lev] for lev in range(self.h_space.num_levels)
+                )
+            ]
+            ctrl_pts = {
+                lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*self.h_space.sh_fns[lev])
+                for lev in range(self.h_space.num_levels)
+            }
+
+        # Refining control points
+        new_ctrl_pts = self.refine_ctrl_pts(ctrl_pts)
+        self.GA = self.refine_ctrl_pts(self.GA)
+
+        # TODO: Coarsening control points
+        self.CP_status = deepcopy(self.h_space.fns)
+        return new_ctrl_pts
+
+    def refine_ctrl_pts(self, ctrl_pts):
+        for lev in range(1, self.h_space.num_levels):
+            curr_coeff = self.h_space.Coeff[lev - 1]
+            for CP in np.ndindex(self.h_space.fns[lev].shape):
+                if self.CP_status[lev][CP] == 0 and self.h_space.fns[lev][CP] == 1:
+                    cp_coeff = [
+                        curr_coeff[dim].T[CP[dim]] for dim in range(self.h_space.ndim)
+                    ]
+                    tp = compute_tensor_product(cp_coeff)
+                    ctrl_pts[lev][CP] = np.sum(
+                        tp[..., np.newaxis] * ctrl_pts[lev - 1],
+                        axis=tuple(range(len(tp.shape))),
+                    )
+        return ctrl_pts
 
     def compute_refinement_operators(self):
         self.h_space.build_hierarchy_from_domain_sequence()
@@ -19,23 +75,33 @@ class THB_layer:
         )
 
     def compute_tensor_product(self, parameters, ctrl_pts):
-        self.ac_spans = compute_active_span(
+        self.ac_spans, num_supp, sub_coeffs = compute_active_span(
             parameters,
             self.h_space.knotvectors,
             self.h_space.cells,
             self.h_space.degrees,
             self.h_space.sh_fns,
-        )
-
-        PHI, num_supp = compute_basis_fns_tp_parallel(
-            parameters,
-            self.ac_spans,
             self.ac_cells,
             self.fn_coeffs,
-            self.h_space.sh_fns,
+        )
+
+        PHI = compute_basis_fns_tp_vectorized(
+            parameters,
             self.h_space.knotvectors,
             self.h_space.degrees,
+            num_supp,
+            sub_coeffs,
         )
+
+        # PHI, num_supp = compute_basis_fns_tp_parallel(
+        #     parameters,
+        #     self.ac_spans,
+        #     self.ac_cells,
+        #     self.fn_coeffs,
+        #     self.h_space.sh_fns,
+        #     self.h_space.knotvectors,
+        #     self.h_space.degrees,
+        # )
 
         self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts = (
             prepare_data_for_evaluation_jax(
@@ -47,6 +113,10 @@ class THB_layer:
                 self.h_space.sh_fns,
             )
         )
+
+    def refine_cells(self, cells):
+        for lev, cellIdx in cells:
+            self.h_space._refine_cell(cellIdx, lev)
 
     def evaluate(self):
         return Evaluate_JAX(self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts)

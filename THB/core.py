@@ -65,6 +65,7 @@ def compute_refinement_operators(
 
     projection_coeff = {}
     projection_coeff[max_lev - 2] = coeffs_tp[max_lev - 1]
+
     for lev in range(max_lev - 3, -1, -1):
         projection_coeff[lev] = compute_projection(
             [coeffs_tp[lev + 1], projection_coeff[lev + 1]], ndim=ndim
@@ -93,12 +94,14 @@ def compute_active_span(
     cells: Dict[int, np.ndarray],
     degrees: Tuple[int],
     fn_shapes: Dict[int, Tuple[int]],
+    ac_cells_ac_supp,
+    fn_coeffs,
 ) -> List[Tuple[int]]:
     """
     Compute the active spans for given parameters.
 
     Args:
-        params (2darray): 2darray of parameter values.
+        params (ndarray): ndarray of parameter values.
         knotvectors (dict): Dictionary containing the knot vectors at
         each level for each dimension.
         cells (dict): Dictionary containing the status of cells at each
@@ -113,6 +116,8 @@ def compute_active_span(
     max_lev = max(cells.keys())
     ndim = len(degrees)
     active_spans = []
+    num_supp = []
+    sub_coeffs = []
 
     for param in params:
         for lev in range(max_lev, -1, -1):
@@ -128,8 +133,40 @@ def compute_active_span(
             )
             if cells[lev][cellIdx] == 1:
                 active_spans.append((lev, cellIdx))
+                supp_fns = ac_cells_ac_supp[lev][cellIdx]
+                num_supp.append(len(supp_fns))
+                sub_coeffs += [fn_coeffs[fn_lev][fnIdx] for fn_lev, fnIdx in supp_fns]
                 break
-    return active_spans
+
+    return active_spans, jnp.array(num_supp), sub_coeffs
+
+
+def compute_basis_fns_tp_vectorized(
+    params,
+    knotvectors,
+    degrees,
+    num_supp,
+    sub_coeffs,
+):
+    max_lev = max(knotvectors.keys())
+    ndim = len(degrees)
+    sub_coeffs = jnp.array(sub_coeffs)
+
+    basis_fns = [
+        basisFun_vectorized(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
+        for dim in range(ndim)
+    ]
+
+    if ndim == 3:
+        basis_fns_tp = jnp.einsum("ij, ik, il -> ijkl", *basis_fns)
+    elif ndim == 2:
+        basis_fns_tp = jnp.einsum("ij, ik -> ijk", *basis_fns)
+
+    basis_fns_tp_repeat = jnp.repeat(basis_fns_tp, num_supp, axis=0)
+
+    PHI = jnp.sum(basis_fns_tp_repeat * sub_coeffs, axis=tuple(range(1, ndim + 1)))
+
+    return PHI
 
 
 def compute_basis_fns_tp(
@@ -164,7 +201,6 @@ def compute_basis_fns_tp(
     max_lev = max(knotvectors.keys())
     ndim = len(degrees)
     PHI = []
-    num_supp_cumsum = [0]
     num_supp = []
 
     for i, g in enumerate(tqdm(params)):
@@ -185,7 +221,6 @@ def compute_basis_fns_tp(
             for dim in range(ndim)
         ]
 
-        num_supp_cumsum.append(num_supp_cumsum[i] + len(cell_supp))
         num_supp.append(len(cell_supp))
 
         for fn in cell_supp:
@@ -199,7 +234,7 @@ def compute_basis_fns_tp(
             fn_value = np.sum(sub_coeff * fn_tp)
             PHI.append(fn_value)
 
-    return np.array(PHI), np.array(num_supp_cumsum)
+    return np.array(PHI), np.array(num_supp)
 
 
 def compute_multilevel_bezier_extraction_operators(

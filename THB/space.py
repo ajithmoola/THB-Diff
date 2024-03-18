@@ -91,15 +91,11 @@ class Space:
 
         self.fns = H
 
-    def refine_basis_fn(self, fnIdx, level):
+    def _refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1
         supp_cells = self.get_support_cell_indices(fnIdx, level)
         for cell in supp_cells:
             self._refine_cell(cell, level)
-
-    def refine_cells(self, list_of_cells):
-        for lev, cell in list_of_cells:
-            self._refine_cell(cell, lev)
 
     def _refine_cell(self, cellIdx, level):
         self.cells[level][cellIdx] = 0

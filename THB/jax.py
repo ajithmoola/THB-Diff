@@ -10,12 +10,11 @@ def prepare_data_for_evaluation_jax(
     nCP = np.zeros(max_lev + 2, dtype=np.int_)
     CP_dim = ctrl_pts[0].shape[-1]
 
-    num_supp = jnp.array(num_supp)
     segment_lengths = num_supp
     num_pts = segment_lengths.size
     segment_ids = jnp.repeat(jnp.arange(num_pts), segment_lengths)
 
-    PHI = jnp.array(PHI).astype(jnp.float32).reshape(-1, 1)
+    PHI = PHI.astype(jnp.float32).reshape(-1, 1)
 
     for lev in range(1, max_lev + 2):
         nCP[lev] = nCP[lev - 1] + np.prod(fn_sh[lev - 1])
@@ -39,5 +38,5 @@ def prepare_data_for_evaluation_jax(
 
 def Evaluate_JAX(ctrl_pts, Jm, PHI, segment_ids, num_pts):
     prod = PHI * ctrl_pts[Jm]
-    output = jnp.zeros((num_pts, 3)).at[segment_ids].add(prod)
+    output = jnp.zeros((num_pts, ctrl_pts.shape[-1])).at[segment_ids].add(prod)
     return output

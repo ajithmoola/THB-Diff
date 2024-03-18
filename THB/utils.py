@@ -32,8 +32,22 @@ class THB_plot:
         ax = self.fig.add_subplot()
         self.ax[axis_name] = ax
 
-    def save_fig(self, dpi=150):
-        self.fig.savefig(
+    def save_all_axes_seperately(self, dpi=150):
+        for ax in self.ax.keys():
+            ax.remove()
+
+            new_fig = plt.figure()
+            new_fig.add_axes(ax)
+
+            self.save_fig
+
+    def save_fig(self, fig=None, dpi=150):
+        if fig is not None:
+            save_fig = fig
+        else:
+            save_fig = self.fig
+
+        save_fig.savefig(
             self.dir + "/" + self.figname + ".pdf",
             dpi=dpi,
             bbox_inches="tight",
@@ -41,6 +55,29 @@ class THB_plot:
             transparent=True,
             format="pdf",
         )
+
+    def plotAdaptiveGrid(self, axisname, THB):
+        if THB.h_space.ndim == 2:
+            ax = self.ax[axisname]
+            ax = plot2DAdaptiveGrid(
+                ax,
+                THB.ac_cells,
+                THB.GA,
+                THB.h_space.knotvectors,
+                THB.fn_coeffs,
+                THB.h_space.sh_fns,
+                THB.h_space.degrees,
+            )
+        elif THB.h_space.ndim == 3:
+            plot3DAdaptiveGrid(
+                self.dir + "/" + axisname,
+                THB.ac_cells,
+                THB.GA,
+                THB.h_space.knotvectors,
+                THB.fn_coeffs,
+                THB.h_space.sh_fns,
+                THB.h_space.degrees,
+            )
 
     def plot_3D_wireframe_surface(
         self, axisname, xyz, shape, linestyle="solid", linewidth=1, color="green"
@@ -149,8 +186,9 @@ def plot3DGrid(cells, knotvectors):
     grid.save("unstructured_grid.vtu")
 
 
-def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees):
-    fig, ax = plt.subplots()
+def plot2DAdaptiveGrid(
+    ax, ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees
+):
     ndim = len(degrees)
     max_lev = len(knot_vectors.keys()) - 1
     knots = {
@@ -227,7 +265,9 @@ def plot2DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
     plt.show()
 
 
-def plot3DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees):
+def plot3DAdaptiveGrid(
+    filename, ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees
+):
     ndim = len(degrees)
     max_lev = len(knot_vectors.keys()) - 1
     knots = {
@@ -322,4 +362,4 @@ def plot3DAdaptiveGrid(ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, d
     cells = np.vstack(cells, dtype=np.int_).ravel()
     grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
-    grid.save("unstructured_grid.vtu")
+    grid.save(filename=filename + ".vtu")
