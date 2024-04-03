@@ -25,6 +25,7 @@ class TensorProduct:
 
 
 class ControlPoints:
+    # Integrated into the THB_layer in eval.py
     def __init__(self, H_space):
         self.h_space = H_space
         self.max_lev = H_space.num_levels - 1

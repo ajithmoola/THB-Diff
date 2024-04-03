@@ -94,14 +94,10 @@ def findSpan(n, p, u, U):
     return mid
 
 
-@jit
-def find_span_vectorized_jax(param, U):
-    n = len(U) - 2
-
-    indices = jnp.searchsorted(U, param, side="right") - 1
-
+def find_span_array_jax(params, U, degree):
+    n = len(U) - degree
+    indices = jnp.searchsorted(U, params, side="right") - 1
     indices = jnp.where(indices > n, n, indices)
-
     return indices
 
 

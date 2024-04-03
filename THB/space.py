@@ -3,6 +3,10 @@ from itertools import product
 from THB.funcs import assemble_Tmatrix
 from THB.core import get_children_fns, support_cells_multi
 
+# TODO: have two different classes for handling domain and functions.
+# The user should be only able to access the domain and the basis functions are
+# computed by taking the domain as input.
+
 
 class Space:
 
@@ -71,7 +75,9 @@ class Space:
             deactivated_fns = []
             H_a = list(zip(*np.nonzero(H[lev])))
             for fn in H_a:
-                supp_cells = self.get_support_cell_indices(fn, lev)
+                supp_cells = support_cells_multi(
+                    self.knotvectors[lev], self.degrees, fn
+                )
                 cell_bool = [
                     True if self.cells[lev][cell] == 1.0 else False
                     for cell in supp_cells
@@ -93,7 +99,7 @@ class Space:
 
     def _refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1
-        supp_cells = self.get_support_cell_indices(fnIdx, level)
+        supp_cells = support_cells_multi(self.knotvectors[level], self.degrees, fnIdx)
         for cell in supp_cells:
             self._refine_cell(cell, level)
 
@@ -117,6 +123,3 @@ class Space:
             )
         for child in children_cells:
             self.cells[level][child] = 0
-
-    def get_support_cell_indices(self, fnIdx, level):
-        return support_cells_multi(self.knotvectors[level], self.degrees, fnIdx)

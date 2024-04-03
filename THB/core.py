@@ -1,10 +1,15 @@
 import numpy as np
 from itertools import product
 from THB.funcs import *
+from THB.utils import timer
 from copy import deepcopy
+import gc
+import sys
+import scipy
+from jax.experimental import sparse
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
-from typing import Dict, Tuple, List, Union
+from typing import Dict, Tuple, List
 
 
 def compute_active_cells_active_supp(
@@ -83,11 +88,57 @@ def compute_refinement_operators(
                 [curr_coeff_tp, projection_coeff[lev]], ndim=ndim
             )
 
-        fn_coeffs[lev] = curr_coeff_tp
+        fn_coeffs[lev] = curr_coeff_tp.astype(np.float16)
 
     return fn_coeffs
 
 
+def faster_compute_active_span(
+    params, knotvectors, cells, degrees, fn_shapes, ac_cells_ac_supp, fn_coeffs
+):
+    max_lev = max(cells.keys())
+    ndim = len(degrees)
+    spans = {}
+    active_spans = []
+    num_supp = []
+    sub_coeffs = []
+
+    for lev in range(max_lev + 1):
+        curr_spans = np.array(
+            [
+                np.array(
+                    find_span_array_jax(
+                        params[:, dim], knotvectors[lev][dim], degrees[dim]
+                    )
+                )
+                - degrees[dim]
+                for dim in range(ndim)
+            ]
+        ).T
+        spans[lev] = tuple(tuple(row) for row in curr_spans)
+
+    for i in tqdm(range(len(params))):
+        for lev in range(max_lev, -1, -1):
+            cellIdx = spans[lev][i]
+
+            if cells[lev][cellIdx] == 1:
+                active_spans.append((lev, cellIdx))
+                curr_supp_fns = ac_cells_ac_supp[lev][cellIdx]
+                # supp_fns += curr_supp_fns
+                num_supp.append(len(curr_supp_fns))
+                sub_coeffs += [
+                    fn_coeffs[fn_lev][fnIdx] for fn_lev, fnIdx in curr_supp_fns
+                ]
+                break
+
+    print("yes")
+    print(sys.getsizeof(sub_coeffs), sys.getsizeof(fn_coeffs))
+    sparse_mat = scipy.sparse.csr_matrix(sub_coeffs)
+    print("yes")
+    return active_spans, jnp.array(num_supp), sparse_mat
+
+
+@timer
 def compute_active_span(
     params: np.ndarray,
     knotvectors: Dict[int, Dict[int, np.ndarray]],
@@ -119,14 +170,16 @@ def compute_active_span(
     num_supp = []
     sub_coeffs = []
 
-    for param in params:
+    for param in tqdm(params):
         for lev in range(max_lev, -1, -1):
+            curr_fn_sh = fn_shapes[lev]
+            curr_knotvectors = knotvectors[lev]
             cellIdx = tuple(
                 findSpan(
-                    fn_shapes[lev][dim] - 1,
+                    curr_fn_sh[dim] - 1,
                     degrees[dim],
                     param[dim],
-                    knotvectors[lev][dim],
+                    curr_knotvectors[dim],
                 )
                 - degrees[dim]
                 for dim in range(ndim)
@@ -141,31 +194,26 @@ def compute_active_span(
     return active_spans, jnp.array(num_supp), sub_coeffs
 
 
-def compute_basis_fns_tp_vectorized(
-    params,
-    knotvectors,
-    degrees,
-    num_supp,
-    sub_coeffs,
-):
-    max_lev = max(knotvectors.keys())
-    ndim = len(degrees)
-    sub_coeffs = jnp.array(sub_coeffs)
-
-    basis_fns = [
+def compute_basis_fns(params, knotvectors, degrees, ndim, max_lev):
+    return [
         basisFun_vectorized(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
         for dim in range(ndim)
     ]
 
+
+def compute_basis_fns_tp_vectorized(degrees, num_supp, sub_coeffs, basis_fns):
+    ndim = len(degrees)
+    sub_coeffs = jnp.array(sub_coeffs)
+    print(1)
     if ndim == 3:
         basis_fns_tp = jnp.einsum("ij, ik, il -> ijkl", *basis_fns)
     elif ndim == 2:
         basis_fns_tp = jnp.einsum("ij, ik -> ijk", *basis_fns)
-
+    print(2)
     basis_fns_tp_repeat = jnp.repeat(basis_fns_tp, num_supp, axis=0)
-
+    print(3)
     PHI = jnp.sum(basis_fns_tp_repeat * sub_coeffs, axis=tuple(range(1, ndim + 1)))
-
+    print(4)
     return PHI
 
 

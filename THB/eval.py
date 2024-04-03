@@ -75,7 +75,7 @@ class THB_layer:
         )
 
     def compute_tensor_product(self, parameters, ctrl_pts):
-        self.ac_spans, num_supp, sub_coeffs = compute_active_span(
+        self.ac_spans, num_supp, sub_coeffs = faster_compute_active_span(
             parameters,
             self.h_space.knotvectors,
             self.h_space.cells,
@@ -85,12 +85,19 @@ class THB_layer:
             self.fn_coeffs,
         )
 
-        PHI = compute_basis_fns_tp_vectorized(
+        basis_fns = compute_basis_fns(
             parameters,
             self.h_space.knotvectors,
             self.h_space.degrees,
+            self.h_space.ndim,
+            self.h_space.num_levels - 1,
+        )
+        print(0)
+        PHI = compute_basis_fns_tp_vectorized(
+            self.h_space.degrees,
             num_supp,
             sub_coeffs,
+            basis_fns,
         )
 
         # PHI, num_supp = compute_basis_fns_tp_parallel(
@@ -103,7 +110,7 @@ class THB_layer:
         #     self.h_space.degrees,
         # )
 
-        self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts = (
+        self.CP, self.Jm, self.PHI, self.segment_ids, self.out_shape = (
             prepare_data_for_evaluation_jax(
                 PHI,
                 self.ac_spans,
@@ -119,20 +126,22 @@ class THB_layer:
             self.h_space._refine_cell(cellIdx, lev)
 
     def evaluate(self):
-        return Evaluate_JAX(self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts)
+        return Evaluate_JAX(
+            self.CP, self.Jm, self.PHI, self.segment_ids, self.out_shape
+        )
 
-    def loss_and_grad(self, loss_fn):
-        return jit(value_and_grad(loss_fn, argnums=0), static_argnums=(4,))
+    def output_and_CP_grad(self, obj_fn):
+        return jit(value_and_grad(obj_fn, argnums=0))
 
     @staticmethod
-    def fitting_MSE_loss(CP, Jm, PHI, segment_ids, num_pts, target):
-        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, num_pts)
+    def fitting_MSE_loss(CP, Jm, PHI, segment_ids, out_shape, target):
+        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, out_shape)
         loss = jnp.mean((output - target) ** 2)
         return loss
 
     @staticmethod
-    def fitting_CD_loss(CP, Jm, PHI, segment_ids, num_pts, target):
-        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, num_pts)
+    def fitting_CD_loss(CP, Jm, PHI, segment_ids, out_shape, target):
+        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, out_shape)
 
         norm1 = jnp.sum(output**2, axis=1, keepdims=True)
         norm2 = jnp.sum(target**2, axis=1, keepdims=True)
@@ -144,3 +153,9 @@ class THB_layer:
 
         CD = jnp.sum(min_dist_1_to_2) + jnp.sum(min_dist_2_to_1)
         return CD
+
+
+class PDE:
+
+    def __init__(self, PDE):
+        self.PDE = PDE
