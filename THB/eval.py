@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from THB.core import *
 from THB.funcs import grevilleAbscissae
 from THB.jax import *
+import numpy as np
 
 
 class THB_layer:
@@ -27,20 +28,34 @@ class THB_layer:
     def update_GA(self):
         self.GA = self.refine_ctrl_pts(self.GA)
 
+    @staticmethod
+    def CP_arr_to_dict(CP_arr, sh_fns, num_levels):
+        CP_arr = np.array(CP_arr)
+        nCP = np.array(
+            [0] + [np.prod(sh_fns[lev]) for lev in range(num_levels)]
+        ).cumsum()
+        ctrl_pts = {
+            lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*sh_fns[lev], CP_arr.shape[1])
+            for lev in range(num_levels)
+        }
+        return ctrl_pts
+
     def update_ctrl_pts(self, CP_arr):
         if type(CP_arr) == dict:
             new_ctrl_pts = CP_arr
         else:
-            CP_arr = np.array(CP_arr)
-            nCP = [0] + [
-                np.prod(
-                    self.h_space.sh_fns[lev] for lev in range(self.h_space.num_levels)
-                )
-            ]
-            ctrl_pts = {
-                lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*self.h_space.sh_fns[lev])
-                for lev in range(self.h_space.num_levels)
-            }
+            # nCP = [0] + [
+            #     np.prod(
+            #         self.h_space.sh_fns[lev] for lev in range(self.h_space.num_levels)
+            #     )
+            # ]
+            # ctrl_pts = {
+            #     lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*self.h_space.sh_fns[lev])
+            #     for lev in range(self.h_space.num_levels)
+            # }
+            ctrl_pts = self.CP_arr_to_dict(
+                CP_arr, self.h_space.sh_fns, self.h_space.num_levels
+            )
 
         # Refining control points
         new_ctrl_pts = self.refine_ctrl_pts(ctrl_pts)
@@ -75,42 +90,48 @@ class THB_layer:
         )
 
     def compute_tensor_product(self, parameters, ctrl_pts):
-        self.ac_spans, num_supp, sub_coeffs = faster_compute_active_span(
+        self.ac_spans = compute_active_span(
             parameters,
             self.h_space.knotvectors,
             self.h_space.cells,
             self.h_space.degrees,
-            self.h_space.sh_fns,
-            self.ac_cells,
-            self.fn_coeffs,
         )
 
-        basis_fns = compute_basis_fns(
-            parameters,
-            self.h_space.knotvectors,
-            self.h_space.degrees,
-            self.h_space.ndim,
-            self.h_space.num_levels - 1,
-        )
-        print(0)
-        PHI = compute_basis_fns_tp_vectorized(
-            self.h_space.degrees,
-            num_supp,
-            sub_coeffs,
-            basis_fns,
-        )
-
-        # PHI, num_supp = compute_basis_fns_tp_parallel(
+        # self.ac_spans, num_supp, sub_coeffs = faster_compute_active_span(
         #     parameters,
-        #     self.ac_spans,
+        #     self.h_space.knotvectors,
+        #     self.h_space.cells,
+        #     self.h_space.degrees,
+        #     self.h_space.sh_fns,
         #     self.ac_cells,
         #     self.fn_coeffs,
-        #     self.h_space.sh_fns,
-        #     self.h_space.knotvectors,
-        #     self.h_space.degrees,
         # )
 
-        self.CP, self.Jm, self.PHI, self.segment_ids, self.out_shape = (
+        # basis_fns = compute_basis_fns(
+        #     parameters,
+        #     self.h_space.knotvectors,
+        #     self.h_space.degrees,
+        #     self.h_space.ndim,
+        #     self.h_space.num_levels - 1,
+        # )
+
+        # PHI = compute_basis_fns_tp_vectorized(
+        #     self.h_space.degrees,
+        #     num_supp,
+        #     sub_coeffs,
+        #     basis_fns,
+        # )
+        PHI, num_supp = compute_THB_fns_tp_parallel(
+            parameters,
+            self.ac_spans,
+            self.ac_cells,
+            self.fn_coeffs,
+            self.h_space.sh_fns,
+            self.h_space.knotvectors,
+            self.h_space.degrees,
+        )
+
+        self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts = (
             prepare_data_for_evaluation_jax(
                 PHI,
                 self.ac_spans,
@@ -126,16 +147,14 @@ class THB_layer:
             self.h_space._refine_cell(cellIdx, lev)
 
     def evaluate(self):
-        return Evaluate_JAX(
-            self.CP, self.Jm, self.PHI, self.segment_ids, self.out_shape
-        )
+        return Evaluate_JAX(self.CP, self.Jm, self.PHI, self.segment_ids, self.num_pts)
 
     def output_and_CP_grad(self, obj_fn):
-        return jit(value_and_grad(obj_fn, argnums=0))
+        return jit(value_and_grad(obj_fn, argnums=0), static_argnums=4)
 
     @staticmethod
-    def fitting_MSE_loss(CP, Jm, PHI, segment_ids, out_shape, target):
-        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, out_shape)
+    def fitting_MSE_loss(CP, Jm, PHI, segment_ids, num_pts, target):
+        output = Evaluate_JAX(CP, Jm, PHI, segment_ids, num_pts)
         loss = jnp.mean((output - target) ** 2)
         return loss
 

@@ -4,6 +4,13 @@ from THB.funcs import *
 import pyvista as pv
 from time import time
 
+from OCC.Core.Geom import Geom_BSplineSurface
+from OCC.Core.TColgp import TColgp_Array2OfPnt
+from OCC.Core.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
+from OCC.Core.gp import gp_Pnt
+from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
+
 
 def timer(func):
     def wrap_func(*args, **kwargs):
@@ -39,7 +46,7 @@ class THB_plot:
             new_fig = plt.figure()
             new_fig.add_axes(ax)
 
-            self.save_fig
+            self.save_fig(new_fig)
 
     def save_fig(self, fig=None, dpi=150):
         if fig is not None:
@@ -91,6 +98,26 @@ class THB_plot:
             linestyle=linestyle,
             linewidth=linewidth,
             color=color,
+        )
+        ax.set_axis_off()
+        ax.grid(False)
+        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
+        plt.margins(0)
+
+    def plot_3D_surface(
+        self, axisname, xyz, shape, color="grey", rstride=None, cstride=None
+    ):
+        ax = self.ax[axisname]
+        xyz = xyz.reshape(*shape, 3)
+        ax.plot_surface(
+            xyz[:, :, 0],
+            xyz[:, :, 1],
+            xyz[:, :, 2],
+            color=color,
+            rstride=rstride,
+            cstride=cstride,
+            edgecolor=None,
+            linewidth=0,
         )
         ax.set_axis_off()
         ax.grid(False)
@@ -363,3 +390,63 @@ def plot3DAdaptiveGrid(
     grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
     grid.save(filename=filename + ".vtu")
+
+
+def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
+    degree_u = degrees[0]
+    degree_v = degrees[1]
+
+    knots_u = np.unique(knotvectors[0])
+    knots_v = np.unique(knotvectors[1])
+
+    multiplicities_u = np.ones_like(knots_u)
+    multiplicities_v = np.ones_like(knots_v)
+    multiplicities_u[0] = degree_u + 1
+    multiplicities_u[-1] = degree_u + 1
+    multiplicities_v[0] = degree_u + 1
+    multiplicities_v[-1] = degree_v + 1
+
+    knots_u_occ = TColStd_Array1OfReal(1, len(knots_u))
+    knots_v_occ = TColStd_Array1OfReal(1, len(knots_v))
+
+    multiplicities_u_occ = TColStd_Array1OfInteger(1, len(multiplicities_u))
+    multiplicities_v_occ = TColStd_Array1OfInteger(1, len(multiplicities_v))
+
+    for i, val in enumerate(knots_u, start=1):
+        knots_u_occ.SetValue(i, val)
+    for i, val in enumerate(knots_v, start=1):
+        knots_v_occ.SetValue(i, val)
+    for i, val in enumerate(multiplicities_u):
+        multiplicities_u_occ.SetValue(i + 1, int(val))
+    for i, val in enumerate(multiplicities_v):
+        multiplicities_v_occ.SetValue(i + 1, int(val))
+
+    control_points_occ = TColgp_Array2OfPnt(1, CP.shape[0], 1, CP.shape[1])
+    for i in range(CP.shape[0]):
+        for j in range(CP.shape[1]):
+            x, y, z = map(float, CP[i, j])
+            control_points_occ.SetValue(i + 1, j + 1, gp_Pnt(x, y, z))
+
+    bspline_surface = Geom_BSplineSurface(
+        control_points_occ,
+        knots_u_occ,
+        knots_v_occ,
+        multiplicities_u_occ,
+        multiplicities_v_occ,
+        degree_u,
+        degree_v,
+        False,
+        False,
+    )
+
+    face = BRepBuilderAPI_MakeFace(bspline_surface, 1e-6).Face()
+
+    writer = STEPControl_Writer()
+    writer.Transfer(face, STEPControl_AsIs)
+
+    status = writer.Write(fname + ".step")
+
+    if status:
+        print("Successfully exported B-spline surface to STEP file.")
+    else:
+        print("Failed to export B-spline surface to STEP file.")

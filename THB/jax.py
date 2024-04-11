@@ -33,12 +33,10 @@ def prepare_data_for_evaluation_jax(
 
     Jm = jnp.array(Jm)
 
-    out_shape = jnp.array([num_pts, CP_dim])
-
-    return ctrl_pts, Jm, PHI, segment_ids, out_shape
+    return ctrl_pts, Jm, PHI, segment_ids, num_pts
 
 
-def Evaluate_JAX(ctrl_pts, Jm, PHI, segment_ids, out_shape):
+def Evaluate_JAX(ctrl_pts, Jm, PHI, segment_ids, num_pts):
     prod = PHI * ctrl_pts[Jm]
-    output = jnp.zeros(out_shape).at[segment_ids].add(prod)
+    output = jnp.zeros((num_pts, ctrl_pts.shape[1])).at[segment_ids].add(prod)
     return output

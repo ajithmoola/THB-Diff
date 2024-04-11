@@ -19,13 +19,13 @@ def refine_knotvector(knotvector, p):
 
 def generate_parametric_coordinates(shape):
     ndim = len(shape)
-    pts = jnp.hstack(
+    pts = np.hstack(
         tuple(
             map(
                 lambda x: x.reshape(-1, 1),
-                jnp.meshgrid(
+                np.meshgrid(
                     *[
-                        jnp.linspace(1e-5, 1, shape[dim], endpoint=False)
+                        np.linspace(1e-5, 1, shape[dim], endpoint=False)
                         for dim in range(ndim)
                     ]
                 ),
