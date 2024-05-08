@@ -393,6 +393,14 @@ def plot3DAdaptiveGrid(
 
 
 def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
+    """Exports maximum level b-spline to a step file
+
+    Args:
+        CP (ndarray): control points
+        knotvectors (list): knotvectors in a tuple
+        degrees (tuple): degree of b-splines in the tensor product
+        fname (str): file name
+    """
     degree_u = degrees[0]
     degree_v = degrees[1]
 
@@ -450,3 +458,53 @@ def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
         print("Successfully exported B-spline surface to STEP file.")
     else:
         print("Failed to export B-spline surface to STEP file.")
+
+
+def plot_active_3D_cells(ac_cells, knotvectors, wd, filename):
+    max_lev = max(ac_cells.keys())
+    ndim = len(knotvectors[0])
+    knots = {
+        lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(ndim)}
+        for lev in range(max_lev + 1)
+    }
+
+    corners = []
+    for lev in range(max_lev + 1):
+        for cell in ac_cells[lev].keys():
+
+            x1 = knots[lev][0][cell[0]]
+            y1 = knots[lev][1][cell[1]]
+            z1 = knots[lev][2][cell[2]]
+            x2 = knots[lev][0][cell[0] + 1]
+            y2 = knots[lev][1][cell[1] + 1]
+            z2 = knots[lev][2][cell[2] + 1]
+
+            llf = [x1, y1, z1]
+            lrf = [x2, y1, z1]
+            urf = [x2, y2, z1]
+            ulf = [x1, y2, z1]
+            llb = [x1, y1, z2]
+            lrb = [x2, y1, z2]
+            urb = [x2, y2, z2]
+            ulb = [x1, y2, z2]
+
+            boxes = np.array([llf, lrf, urf, ulf, llb, lrb, urb, ulb])
+
+            corners.append(boxes)
+
+    num_cells = len(corners)
+    corners = np.vstack(corners)
+    unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
+
+    cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
+
+    cells = [
+        np.concatenate(
+            [np.array([8]), inverse_indices[8 * i : 8 * i + 8]], dtype=np.int_
+        )
+        for i in range(num_cells)
+    ]
+    cells = np.vstack(cells, dtype=np.int_).ravel()
+    grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
+
+    grid.save(filename=wd + "/" + filename + ".vtu")

@@ -42,7 +42,7 @@ class THB_layer:
 
     def update_ctrl_pts(self, CP_arr):
         if type(CP_arr) == dict:
-            new_ctrl_pts = CP_arr
+            ctrl_pts = CP_arr
         else:
             # nCP = [0] + [
             #     np.prod(

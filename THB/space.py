@@ -17,6 +17,7 @@ class Space:
             self.H[lev] = self.H[lev - 1].refine_tensorproduct()
         self.num_levels = num_levels
         self.ndim = len(tensor_product.bsplines)
+        self.fn_states = []
         self.initialize_datastructures()
         self.compute_coefficients()
 
@@ -96,6 +97,8 @@ class Space:
                 H[lev + 1][idx] = 1
 
         self.fns = H
+
+        self.fn_states.append(H)
 
     def _refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1

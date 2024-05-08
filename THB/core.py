@@ -153,7 +153,7 @@ def compute_active_span(params, knotvectors, cells, degrees):
         ).T
         spans[lev] = tuple(tuple(row) for row in curr_spans)
 
-    for i in range(len(params)):
+    for i in tqdm(range(len(params))):
         for lev in range(max_lev, -1, -1):
             cellIdx = spans[lev][i]
 
@@ -252,7 +252,31 @@ def compute_THB_fns_tp(
             fn_value = np.sum(sub_coeff * fn_tp)
             PHI.append(fn_value)
 
-    return np.array(PHI)
+    return np.array(PHI), np.array(num_supp)
+
+
+def CP_arr_to_dict(CP_arr, sh_fns, num_levels):
+    CP_arr = np.array(CP_arr)
+    nCP = np.array([0] + [np.prod(sh_fns[lev]) for lev in range(num_levels)]).cumsum()
+    ctrl_pts = {
+        lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*sh_fns[lev], CP_arr.shape[1])
+        for lev in range(num_levels)
+    }
+    return ctrl_pts
+
+
+def refine_ctrl_pts(CP, Coeffs, curr_fn_state, prev_fn_state, sh_fns, num_levels, ndim):
+    for lev in range(1, num_levels):
+        curr_coeff = Coeffs[lev]
+        for fn in np.ndindex(sh_fns[lev]):
+            if prev_fn_state[lev][fn] == 0 and curr_fn_state[lev][fn] == 1:
+                refine_coeff = [curr_coeff[dim].T[fn[dim]] for dim in range(ndim)]
+                refine_coeff_tp = compute_tensor_product(refine_coeff)
+                CP[lev][CP] = np.sum(
+                    refine_coeff_tp[..., np.newaxis] * CP[lev - 1],
+                    axis=tuple(range(len(refine_coeff_tp.shape))),
+                )
+    return CP
 
 
 def compute_multilevel_bezier_extraction_operators(
