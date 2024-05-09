@@ -3,9 +3,6 @@ from itertools import product
 from THB.funcs import *
 from THB.utils import timer
 from copy import deepcopy
-import gc
-import sys
-import scipy
 from jax.experimental import sparse
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
