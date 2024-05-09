@@ -1,8 +1,13 @@
 import numpy as np
-from THB.funcs import refine_knotvector, compute_tensor_product, assemble_Tmatrix
 from itertools import product
-from THB.core import get_children_fns, support_cells_multi
 from copy import deepcopy
+
+from THB.core import get_children_fns, support_cells_multi
+from THB.bspline_funcs import (
+    refine_knotvector,
+    compute_tensor_product,
+    assemble_Tmatrix,
+)
 
 
 class BSpline:

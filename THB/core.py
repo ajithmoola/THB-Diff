@@ -1,12 +1,13 @@
 import numpy as np
 from itertools import product
-from THB.funcs import *
-from THB.utils import timer
 from copy import deepcopy
 from jax.experimental import sparse
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 from typing import Dict, Tuple, List
+
+from THB.bspline_funcs import *
+from THB.utils import timer
 
 
 def compute_active_cells_active_supp(

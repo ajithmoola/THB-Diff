@@ -1,7 +1,8 @@
 import torch
-import THB_eval
 import numpy as np
 from THB.utils import timer
+
+import THB_eval
 
 
 class THB_nn_module(torch.nn.Module):

@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from THB.funcs import *
 import pyvista as pv
 from time import time
 
@@ -10,6 +9,8 @@ from OCC.Core.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
 from OCC.Core.gp import gp_Pnt
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
+
+from THB.bspline_funcs import *
 
 
 def timer(func):

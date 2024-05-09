@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 import jax.numpy as jnp
-from THB.jax_funcs import jit
+from jax import jit
 
 
 def refine_knotvector(knotvector, p):
