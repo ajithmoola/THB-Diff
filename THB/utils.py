@@ -3,12 +3,12 @@ import numpy as np
 import pyvista as pv
 from time import time
 
-from OCC.Core.Geom import Geom_BSplineSurface
-from OCC.Core.TColgp import TColgp_Array2OfPnt
-from OCC.Core.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
-from OCC.Core.gp import gp_Pnt
-from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
+# from OCC.Core.Geom import Geom_BSplineSurface
+# from OCC.Core.TColgp import TColgp_Array2OfPnt
+# from OCC.Core.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
+# from OCC.Core.gp import gp_Pnt
+# from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+# from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
 
 from THB.bspline_funcs import *
 
@@ -315,18 +315,18 @@ def plot3DAdaptiveGrid(
             y2 = knots[lev][1][cell[1] + 1]
             z2 = knots[lev][2][cell[2] + 1]
 
-            if y2 == 1:
-                y2 -= 1e-9
-            if x2 == 1:
-                x2 -= 1e-9
-            if z2 == 1:
-                z2 -= 1e-9
-            if y1 == 0:
-                y1 += 1e-9
-            if x1 == 0:
-                x1 += 1e-9
-            if z1 == 0:
-                z1 += 1e-9
+            # if y2 == 1:
+            #     y2 -= 1e-9
+            # if x2 == 1:
+            #     x2 -= 1e-9
+            # if z2 == 1:
+            #     z2 -= 1e-9
+            # if y1 == 0:
+            #     y1 += 1e-9
+            # if x1 == 0:
+            #     x1 += 1e-9
+            # if z1 == 0:
+            #     z1 += 1e-9
 
             llf = [x1, y1, z1]
             lrf = [x2, y1, z1]
@@ -393,72 +393,72 @@ def plot3DAdaptiveGrid(
     grid.save(filename=filename + ".vtu")
 
 
-def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
-    """Exports maximum level b-spline to a step file
+# def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
+#     """Exports maximum level b-spline to a step file
 
-    Args:
-        CP (ndarray): control points
-        knotvectors (list): knotvectors in a tuple
-        degrees (tuple): degree of b-splines in the tensor product
-        fname (str): file name
-    """
-    degree_u = degrees[0]
-    degree_v = degrees[1]
+#     Args:
+#         CP (ndarray): control points
+#         knotvectors (list): knotvectors in a tuple
+#         degrees (tuple): degree of b-splines in the tensor product
+#         fname (str): file name
+#     """
+#     degree_u = degrees[0]
+#     degree_v = degrees[1]
 
-    knots_u = np.unique(knotvectors[0])
-    knots_v = np.unique(knotvectors[1])
+#     knots_u = np.unique(knotvectors[0])
+#     knots_v = np.unique(knotvectors[1])
 
-    multiplicities_u = np.ones_like(knots_u)
-    multiplicities_v = np.ones_like(knots_v)
-    multiplicities_u[0] = degree_u + 1
-    multiplicities_u[-1] = degree_u + 1
-    multiplicities_v[0] = degree_u + 1
-    multiplicities_v[-1] = degree_v + 1
+#     multiplicities_u = np.ones_like(knots_u)
+#     multiplicities_v = np.ones_like(knots_v)
+#     multiplicities_u[0] = degree_u + 1
+#     multiplicities_u[-1] = degree_u + 1
+#     multiplicities_v[0] = degree_u + 1
+#     multiplicities_v[-1] = degree_v + 1
 
-    knots_u_occ = TColStd_Array1OfReal(1, len(knots_u))
-    knots_v_occ = TColStd_Array1OfReal(1, len(knots_v))
+#     knots_u_occ = TColStd_Array1OfReal(1, len(knots_u))
+#     knots_v_occ = TColStd_Array1OfReal(1, len(knots_v))
 
-    multiplicities_u_occ = TColStd_Array1OfInteger(1, len(multiplicities_u))
-    multiplicities_v_occ = TColStd_Array1OfInteger(1, len(multiplicities_v))
+#     multiplicities_u_occ = TColStd_Array1OfInteger(1, len(multiplicities_u))
+#     multiplicities_v_occ = TColStd_Array1OfInteger(1, len(multiplicities_v))
 
-    for i, val in enumerate(knots_u, start=1):
-        knots_u_occ.SetValue(i, val)
-    for i, val in enumerate(knots_v, start=1):
-        knots_v_occ.SetValue(i, val)
-    for i, val in enumerate(multiplicities_u):
-        multiplicities_u_occ.SetValue(i + 1, int(val))
-    for i, val in enumerate(multiplicities_v):
-        multiplicities_v_occ.SetValue(i + 1, int(val))
+#     for i, val in enumerate(knots_u, start=1):
+#         knots_u_occ.SetValue(i, val)
+#     for i, val in enumerate(knots_v, start=1):
+#         knots_v_occ.SetValue(i, val)
+#     for i, val in enumerate(multiplicities_u):
+#         multiplicities_u_occ.SetValue(i + 1, int(val))
+#     for i, val in enumerate(multiplicities_v):
+#         multiplicities_v_occ.SetValue(i + 1, int(val))
 
-    control_points_occ = TColgp_Array2OfPnt(1, CP.shape[0], 1, CP.shape[1])
-    for i in range(CP.shape[0]):
-        for j in range(CP.shape[1]):
-            x, y, z = map(float, CP[i, j])
-            control_points_occ.SetValue(i + 1, j + 1, gp_Pnt(x, y, z))
+#     control_points_occ = TColgp_Array2OfPnt(1, CP.shape[0], 1, CP.shape[1])
+#     for i in range(CP.shape[0]):
+#         for j in range(CP.shape[1]):
+#             x, y, z = map(float, CP[i, j])
+#             control_points_occ.SetValue(i + 1, j + 1, gp_Pnt(x, y, z))
 
-    bspline_surface = Geom_BSplineSurface(
-        control_points_occ,
-        knots_u_occ,
-        knots_v_occ,
-        multiplicities_u_occ,
-        multiplicities_v_occ,
-        degree_u,
-        degree_v,
-        False,
-        False,
-    )
+#     bspline_surface = Geom_BSplineSurface(
+#         control_points_occ,
+#         knots_u_occ,
+#         knots_v_occ,
+#         multiplicities_u_occ,
+#         multiplicities_v_occ,
+#         degree_u,
+#         degree_v,
+#         False,
+#         False,
+#     )
 
-    face = BRepBuilderAPI_MakeFace(bspline_surface, 1e-6).Face()
+#     face = BRepBuilderAPI_MakeFace(bspline_surface, 1e-6).Face()
 
-    writer = STEPControl_Writer()
-    writer.Transfer(face, STEPControl_AsIs)
+#     writer = STEPControl_Writer()
+#     writer.Transfer(face, STEPControl_AsIs)
 
-    status = writer.Write(fname + ".step")
+#     status = writer.Write(fname + ".step")
 
-    if status:
-        print("Successfully exported B-spline surface to STEP file.")
-    else:
-        print("Failed to export B-spline surface to STEP file.")
+#     if status:
+#         print("Successfully exported B-spline surface to STEP file.")
+#     else:
+#         print("Failed to export B-spline surface to STEP file.")
 
 
 def plot_active_3D_cells(ac_cells, knotvectors, wd, filename):

@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 import jax.numpy as jnp
-from jax import jit
+from jax import jit, vmap, jacfwd
 
 
 def refine_knotvector(knotvector, p):
@@ -51,32 +51,12 @@ def grevilleAbscissae(fn_sh, degrees, knotvectors):
     return CP
 
 
-def compute_projection(args, ndim):
-    if ndim == 2:
-        return np.einsum("ijkl, klmn -> ijmn", *args, optimize=True)
-    elif ndim == 3:
-        return np.einsum("ijklmn, lmnopq -> ijkopq", *args, optimize=True)
-
-
-def compute_coeff_tensor_product(args):
-    if len(args) == 2:
-        return np.einsum("ij, kl -> ikjl", *args, optimize=True)
-    elif len(args) == 3:
-        return np.einsum("ij, kl, mn -> ikmjln", *args, optimize=True)
-
-
+@jit
 def compute_tensor_product(args):
     if len(args) == 2:
-        return np.einsum("i, j -> ij", *args)
+        return jnp.einsum("i, j -> ij", *args)
     if len(args) == 3:
-        return np.einsum("i, j, k -> ijk", *args, optimize=True)
-
-
-def compute_bezier_projection(args, ndim):
-    if ndim == 2:
-        return np.einsum("ij, ijkl -> kl", *args, optimize=True)
-    elif ndim == 3:
-        return np.einsum("ijk, ijklmn -> lmn", *args, optimize=True)
+        return jnp.einsum("i, j, k -> ijk", *args, optimize=True)
 
 
 def findSpan(n, p, u, U):
@@ -94,10 +74,12 @@ def findSpan(n, p, u, U):
     return mid
 
 
+@jit
 def find_span_array_jax(params, U, degree):
-    n = len(U) - degree
+    n = len(U) - degree - 1
     indices = jnp.searchsorted(U, params, side="right") - 1
     indices = jnp.where(indices > n, n, indices)
+    indices = jnp.where(params == U[-1], n - 1, indices)
     return indices
 
 
@@ -127,9 +109,49 @@ def divisionbyzero(numerator, denominator):
     )
 
 
-def basisFun_vectorized(params1d, knotvector, degree):
+# def basisFun_vectorized(params1d, knotvector, degree):
+#     U = jnp.expand_dims(params1d, -1)
+#     knots = jnp.expand_dims(knotvector, 0)
+
+#     spans = find_span_array_jax(params1d, knotvector, degree) - degree
+
+#     K = jnp.where(
+#         knots == knotvector[-1], knotvector[-1] + jnp.finfo(U.dtype).eps, knots
+#     )
+
+#     t1 = U >= K[..., :-1]
+#     t2 = U < K[..., 1:]
+
+#     N = (t1 * t2) + 0.0
+
+#     for p in range(1, degree + 1):
+
+#         term1 = divisionbyzero(
+#             N[..., :-1] * (U - K[..., : -p - 1]), K[..., p:-1] - K[..., : -p - 1]
+#         )
+
+#         term2 = divisionbyzero(
+#             N[..., 1:] * (K[..., p + 1 :] - U), K[..., p + 1 :] - K[..., 1:-p]
+#         )
+
+#         N = term1 + term2
+
+#     n = params1d.shape[0]
+#     result = jnp.zeros((n, degree + 1))
+
+#     idx = jnp.arange(degree + 1)
+#     span_indices = spans[:, None] + idx[None, :]
+#     result = N[jnp.arange(n)[:, None], span_indices]
+
+#     return result
+
+
+def basisFun_jax(param, knotvector, degree):
+    params1d = jnp.array(param)
     U = jnp.expand_dims(params1d, -1)
     knots = jnp.expand_dims(knotvector, 0)
+
+    spans = find_span_array_jax(params1d, knotvector, degree) - degree
 
     K = jnp.where(
         knots == knotvector[-1], knotvector[-1] + jnp.finfo(U.dtype).eps, knots
@@ -151,8 +173,25 @@ def basisFun_vectorized(params1d, knotvector, degree):
         )
 
         N = term1 + term2
+    result = jnp.zeros((1, degree + 1))
 
-    return N
+    idx = jnp.arange(degree + 1)
+    span_indices = spans + idx
+    result = N[jnp.arange(1)[:, None], span_indices]
+
+    return result
+
+
+def basis_fns_vmap(params, knotvector, degree):
+    return vmap(basisFun_jax, in_axes=(0, None, None))(
+        jnp.expand_dims(params, -1), knotvector, degree
+    ).squeeze()
+
+
+def der_basis_fns_vmap(params, knotvector, degree):
+    return vmap(jacfwd(basisFun_jax, argnums=0), in_axes=(0, None, None))(
+        jnp.expand_dims(params, -1), knotvector, degree
+    ).squeeze()
 
 
 @njit

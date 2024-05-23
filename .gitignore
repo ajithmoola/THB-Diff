@@ -156,6 +156,9 @@ cython_debug/
 
 .vscode/
 
+.ipynb_checkpoints
+.ipynb
+
 Tests/
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

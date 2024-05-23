@@ -31,11 +31,6 @@ class TensorProduct:
         return self.next_level
 
 
-# TODO: have two different classes for handling domain and functions.
-# The user should be only able to access the domain and the basis functions are
-# computed by taking the domain as input.
-
-
 class Space:
 
     def __init__(self, tensor_product, num_levels):
