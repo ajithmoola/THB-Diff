@@ -48,7 +48,7 @@ class THBEval(torch.autograd.Function):
 
 
 def prepare_data_for_CUDA_evaluation(
-    PHI, ac_spans, num_supp, ctrl_pts, ac_cells_ac_supp, fn_sh, device
+    PHI, num_supp, ctrl_pts, cells_supp, fn_sh, device
 ):
     max_lev = max(ctrl_pts.keys())
     nCP = np.zeros(max_lev + 2, dtype=np.int_)
@@ -71,8 +71,8 @@ def prepare_data_for_CUDA_evaluation(
 
     Jm = [
         nCP[fn_lev] + np.ravel_multi_index(fnIdx, fn_sh[fn_lev])
-        for cell_lev, cellIdx in ac_spans
-        for fn_lev, fnIdx in ac_cells_ac_supp[cell_lev][cellIdx]
+        for cell_supp in cells_supp
+        for fn_lev, fnIdx in cell_supp
     ]
 
     Jm = torch.tensor(Jm).to(device)
@@ -123,6 +123,6 @@ def prepare_data_for_evaluation(
 def Evaluate(ctrl_pts, Jm, PHI, segment_ids, num_pts, device):
     return (
         torch.zeros((num_pts, 3))
-        .to(device=device)
         .scatter_add_(0, segment_ids, ctrl_pts[Jm] * PHI)
+        .to(device=device)
     )

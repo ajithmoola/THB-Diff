@@ -3,9 +3,11 @@ from itertools import product
 from copy import deepcopy
 import jax.numpy as jnp
 from jax import jacfwd, jit, lax
+import jax
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 from typing import Dict, Tuple, List
+from functools import partial
 
 from THB.bspline_funcs import *
 from THB.utils import timer
@@ -108,164 +110,10 @@ def compute_refinement_operators(
                 [curr_coeff_tp, projection_coeff[lev]], ndim=ndim
             )
 
-        fn_coeffs[lev] = jnp.array(curr_coeff_tp).astype(jnp.float16)
+        fn_coeffs[lev] = np.array(curr_coeff_tp).astype(np.float16)
 
-    fn_coeffs[max_lev] = jnp.ones((*fns[max_lev].shape, *fns[max_lev].shape))
+    fn_coeffs[max_lev] = np.ones((*fns[max_lev].shape, *fns[max_lev].shape))
     return fn_coeffs
-
-
-def compute_active_span_v2(
-    params, knotvectors, cells, degrees, ac_cells_ac_supp, fn_coeffs
-):
-    max_lev = max(cells.keys())
-    ndim = len(degrees)
-    spans = {}
-    active_spans = []
-    num_supp = []
-    sub_coeffs = []
-
-    for lev in range(max_lev + 1):
-        curr_spans = np.array(
-            [
-                np.array(
-                    find_span_array_jax(
-                        params[:, dim], knotvectors[lev][dim], degrees[dim]
-                    )
-                )
-                - degrees[dim]
-                for dim in range(ndim)
-            ]
-        ).T
-        spans[lev] = tuple(tuple(row) for row in curr_spans)
-
-    for i in tqdm(range(len(params))):
-        for lev in range(max_lev, -1, -1):
-            cellIdx = spans[lev][i]
-
-            if cells[lev][cellIdx] == 1:
-                active_spans.append((lev, cellIdx))
-                curr_supp_fns = ac_cells_ac_supp[lev][cellIdx]
-                num_supp.append(len(curr_supp_fns))
-                sub_coeffs += [
-                    fn_coeffs[fn_lev][fnIdx] for fn_lev, fnIdx in curr_supp_fns
-                ]
-                break
-
-    return active_spans, jnp.array(num_supp), sub_coeffs
-
-
-def compute_active_span(params, knotvectors, cells, degrees, ac_cells_ac_supp):
-    max_lev = max(cells.keys())
-    ndim = len(degrees)
-    spans = {}
-    active_spans = []
-    active_cell_supp = []
-    num_supp = []
-
-    for lev in range(max_lev + 1):
-        curr_spans = np.array(
-            [
-                np.array(
-                    find_span_array_jax(
-                        params[:, dim], knotvectors[lev][dim], degrees[dim]
-                    )
-                )
-                - degrees[dim]
-                for dim in range(ndim)
-            ]
-        ).T
-        spans[lev] = tuple(tuple(row) for row in curr_spans)
-
-    for i in tqdm(range(len(params))):
-        for lev in range(max_lev, -1, -1):
-            cellIdx = spans[lev][i]
-
-            if cells[lev][cellIdx] == 1:
-                cell_supp = ac_cells_ac_supp[lev][cellIdx]
-                active_cell_supp.append(cell_supp)
-                num_supp.append(len(cell_supp))
-                break
-
-    return active_cell_supp, num_supp
-
-
-def compute_THB_fns_diff(
-    params, ac_spans, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
-):
-    max_lev = max(knotvectors.keys())
-    ndim = len(degrees)
-
-    for i, g in enumerate(tqdm(params)):
-        cell_lev, cellIdx = ac_spans[i]
-        cell_supp = ac_cells_supp[cell_lev][cellIdx]
-
-
-def compute_THB_fns_tp(
-    params: np.ndarray,
-    ac_spans: List[Tuple[int]],
-    ac_cells_supp: Dict[int, Dict[Tuple[int], List[Tuple[int]]]],
-    fn_coeffs: Dict[int, np.ndarray],
-    fn_shapes: Dict[int, Tuple[int]],
-    knotvectors: Dict[int, Dict[int, np.ndarray]],
-    degrees: Tuple[int],
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Compute the basis function tensor product for given parameters.
-
-    Args:
-        params (list): List of parameter values.
-        ac_spans (list): List of active spans for the given parameters.
-        ac_cells_supp (dict): Dictionary containing the active cells and their
-        supports at each level.
-        fn_coeffs (dict): Dictionary containing the refinement operator of
-        basis functions at each level.
-        fn_shapes (dict): Dictionary containing the shape of basis functions at
-        each level.
-        knotvectors (dict): Dictionary containing the knot vectors at each level.
-        degrees (tuple): Tuple of degrees for each dimension.
-
-    Returns:
-        numpy.ndarray: Flattened array of basis function values.
-        numpy.ndarray: Array of cumulative sums of the number of supports.
-        numpy.ndarray: Array of number of supports for each parameter.
-    """
-    max_lev = max(knotvectors.keys())
-    ndim = len(degrees)
-    PHI = []
-    num_supp = []
-
-    for i, g in enumerate(tqdm(params)):
-        cell_lev, cellIdx = ac_spans[i]
-        cell_supp = ac_cells_supp[cell_lev][cellIdx]
-
-        max_lev_cellIdx = [
-            findSpan(
-                fn_shapes[max_lev][dim], degrees[dim], g[dim], knotvectors[max_lev][dim]
-            )
-            for dim in range(ndim)
-        ]
-
-        basis_fns = [
-            basisFun(
-                max_lev_cellIdx[dim], g[dim], degrees[dim], knotvectors[max_lev][dim]
-            )
-            for dim in range(ndim)
-        ]
-
-        num_supp.append(len(cell_supp))
-
-        slice_tuple = tuple(
-            slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
-            for dim in range(ndim)
-        )
-        fn_tp = compute_tensor_product(basis_fns)
-        for fn in cell_supp:
-            fn_lev, fnIdx = fn
-            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-            fn_value = np.sum(sub_coeff * fn_tp)
-            PHI.append(fn_value)
-
-    return np.array(PHI), np.array(num_supp)
 
 
 def CP_arr_to_dict(CP_arr, sh_fns, num_levels):
@@ -513,6 +361,119 @@ def compute_subdivision_coefficients(
     return subdivision_coeffs
 
 
+######### Basis Function Tensorproduct Computation ###########
+
+
+def compute_active_span(params, knotvectors, cells, degrees, ac_cells_ac_supp):
+    max_lev = max(cells.keys())
+    ndim = len(degrees)
+    spans = {}
+    active_spans = []
+    active_cell_supp = []
+    num_supp = []
+
+    for lev in range(max_lev + 1):
+        curr_spans = np.array(
+            [
+                np.array(
+                    find_span_array_jax(
+                        params[:, dim], knotvectors[lev][dim], degrees[dim]
+                    )
+                )
+                - degrees[dim]
+                for dim in range(ndim)
+            ]
+        ).T
+        spans[lev] = tuple(tuple(row) for row in curr_spans)
+
+    for i in tqdm(range(len(params))):
+        for lev in range(max_lev, -1, -1):
+            cellIdx = spans[lev][i]
+
+            if cells[lev][cellIdx] == 1:
+                cell_supp = ac_cells_ac_supp[lev][cellIdx]
+                active_cell_supp.append(cell_supp)
+                num_supp.append(len(cell_supp))
+                break
+
+    return active_cell_supp, np.array(num_supp)
+
+
+def THB_basis_fns_tp_serial(
+    params, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
+):
+    """
+    Compute the basis function tensor product in a serial manner.
+
+    Args:
+        params (ndarray): List of parameter values.
+        ac_cells_supp (dict): Dictionary containing the active cells and their supports at each level.
+        fn_coeffs (dict): Dictionary containing the coefficients of basis functions at each level.
+        fn_shapes (dict): Dictionary containing the shape of basis functions at each level.
+        knotvectors (dict): Dictionary containing the knot vectors at each level.
+        degrees (list): List of degrees for each dimension.
+
+    Returns:
+        numpy.ndarray: Array of basis function values.
+        numpy.ndarray: Array of number of supports for each parameter.
+    """
+
+    def basis_fn_worker(param_idx, param):
+        max_lev = max(knotvectors.keys())
+        ndim = len(degrees)
+        cell_supp = ac_cells_supp[param_idx]
+
+        max_lev_cellIdx = [
+            findSpan(
+                fn_shapes[max_lev][dim],
+                degrees[dim],
+                param[dim],
+                knotvectors[max_lev][dim],
+            )
+            for dim in range(ndim)
+        ]
+
+        basis_fns = [
+            basisFun(
+                max_lev_cellIdx[dim],
+                param[dim],
+                degrees[dim],
+                knotvectors[max_lev][dim],
+            )
+            for dim in range(ndim)
+        ]
+
+        slice_tuple = tuple(
+            slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
+            for dim in range(ndim)
+        )
+        all_fn_values = []
+        all_fn_coeffs = []
+        fn_tp = compute_tensor_product(basis_fns)
+        for fn in cell_supp:
+            fn_lev, fnIdx = fn
+            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
+            fn_value = np.sum(sub_coeff * fn_tp)
+            all_fn_values.append(fn_value)
+            all_fn_coeffs.append(sub_coeff)
+        return (
+            all_fn_values,
+            np.array(max_lev_cellIdx),
+            np.array(all_fn_coeffs),
+        )
+
+    PHI = []
+    spans = []
+    COEFF = []
+    for i, g in tqdm(enumerate(params)):
+        a, b, c = basis_fn_worker(i, g)
+        PHI.append(a)
+        spans.append(b)
+        COEFF.append(c)
+
+    return np.array(PHI).reshape(-1), np.array(spans), np.vstack(COEFF)
+
+
 ######### Parallel Basis Function Tensorproduct Computation ###########
 
 
@@ -552,10 +513,18 @@ def basis_fn_worker(
         for dim in range(ndim)
     ]
 
+    # basis_fns = [
+    # basisFun_jax(param[dim], knotvectors[max_lev][dim], degrees[dim]).squeeze()
+    # for dim in range(ndim)
+    # ]
+
     basis_fns = [
-        basisFun_jax(param[dim], knotvectors[max_lev][dim], degrees[dim]).squeeze()
+        basisFun(
+            max_lev_cellIdx[dim], param[dim], degrees[dim], knotvectors[max_lev][dim]
+        )
         for dim in range(ndim)
     ]
+
     slice_tuple = tuple(
         slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
         for dim in range(ndim)
@@ -565,8 +534,9 @@ def basis_fn_worker(
     for fn in cell_supp:
         fn_lev, fnIdx = fn
         sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-        fn_value = jnp.sum(sub_coeff * fn_tp)
+        fn_value = np.sum(sub_coeff * fn_tp)
         all_fn_values.append(fn_value)
+
     return all_fn_values
 
 
@@ -578,7 +548,6 @@ def THB_basis_fns_tp_parallel(
 
     Args:
         params (ndarray): List of parameter values.
-        ac_spans (list): List of active spans.
         ac_cells_supp (dict): Dictionary containing the active cells and their supports at each level.
         fn_coeffs (dict): Dictionary containing the coefficients of basis functions at each level.
         fn_shapes (dict): Dictionary containing the shape of basis functions at each level.
@@ -598,34 +567,62 @@ def THB_basis_fns_tp_parallel(
 
         PHI = pool.starmap(basis_fn_worker, tasks)
 
-    return jnp.array(PHI)
+    return np.array(PHI).reshape(-1)
 
 
+####################### Testing ############################
+
+
+@partial(jit, static_argnums=(4))
 def THB_basis_fns(
     params: jnp.ndarray,
-    ac_cells_supp: List[List[int, Tuple[int]]],
-    num_supp: List[int],
-    fn_coeffs: Dict[int : np.ndarray],
-    fn_shapes: Dict[int, Tuple[int]],
-    knotvectors: Dict[int, Tuple[np.ndarray]],
+    fn_coeffs_indexed: jnp.ndarray,
+    repeat_ind: List[int],
+    knotvectors: Tuple[np.ndarray],
     degrees: Tuple[int],
-    return_mode: List[bool, bool] = [True, False],
 ) -> jnp.ndarray:
-    """Computes THB-spline tensor product of basis functions or derivates of the basis functions
+    ndim = len(degrees)
 
-    Args:
-        params (ndarray): an array of parametric coordinates
-        ac_cells_supp (list): A list of tuples which contains indices of non-zero basis functions corresponding to the parameter value
-        num_supp (list): a list containing number of non-zero basis functions for at each parameteric coordinate
-        fn_coeffs (dict): a dictionary of ndarrays containing coefficients for each basis function in every level which projects them to the highest level
-        fn_shapes (dict): a dictionary of tuples describing the number of the basis functions in the tensor product along parametric directions
-        knotvectors (dict): a dictionary of tuples of ndarrays representing knotvectors
-        degrees (tuple): degree of each dimension
-        return_mode (list, optional): If [True, False] only the basis functions are returned, elif [False, True] only the derivatives of basis functions are returned, elif [True, True] both are returned. Defaults to [True, False].
+    basis_fns = [
+        basis_fns_vmap(params[:, dim], knotvectors[dim], degrees[dim])
+        for dim in range(ndim)
+    ]
 
-    Returns:
-        ndarray or tuple of ndarrays: flattened tensor product of basis functions or derivatives of basis functions or both
-    """
+    if ndim == 3:
+        basis_fns_tp = jnp.einsum("ij, ik, il -> ijkl", *basis_fns)
+    elif ndim == 2:
+        basis_fns_tp = jnp.einsum("ij, ik -> ijk", *basis_fns)
+
+    PHI = jnp.einsum("i... -> i", basis_fns_tp[repeat_ind] * fn_coeffs_indexed)
+
+    return PHI.reshape(-1, 1)
+
+
+@partial(jit, static_argnums=(6))
+def THB_evaluate(
+    params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
+):
+    num_pts = params.shape[0]
+    PHI = THB_basis_fns(params, fn_coeffs_indexed, repeat_ind, knotvectors, degrees)
+    prod = PHI * ctrl_pts[Jm]
+    output = jnp.zeros((num_pts, ctrl_pts.shape[1])).at[repeat_ind].add(prod)
+    return output
+
+
+# @partial(jit, static_argnums=(6))
+def THB_jacobian(
+    params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
+):
+    jacobian = jacfwd(THB_evaluate, argnums=0)(
+        params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
+    )
+    indices = jnp.arange(params.shape[0])
+    return jacobian[indices, :, indices, :]
+
+
+def pre_process_data(
+    params, fn_coeffs, ctrl_pts, ac_cells_supp, fn_shapes, knotvectors, degrees
+):
     max_lev = max(knotvectors.keys())
     ndim = len(degrees)
 
@@ -640,7 +637,15 @@ def THB_basis_fns(
         for lev in range(max_lev + 1)
     ]
 
-    fn_coeffs = jnp.vstack(fn_coeffs_flat)
+    fn_coeffs_flat = jnp.vstack(fn_coeffs_flat)
+
+    CP_dim = ctrl_pts[0].shape[-1]
+    ctrl_pts_flat = [
+        jnp.array(ctrl_pts[lev]).reshape(-1, CP_dim).astype(jnp.float32)
+        for lev in range(max_lev + 1)
+    ]
+    ctrl_pts_stack = jnp.vstack(ctrl_pts_flat)
+
     Jm = jnp.array(
         [
             n_fns[fn_lev] + np.ravel_multi_index(fnIdx, fn_shapes[fn_lev])
@@ -649,53 +654,51 @@ def THB_basis_fns(
         ]
     )
 
-    spans = [
-        find_span_array_jax(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
-        - degrees[dim]
-        for dim in range(ndim)
-    ]
+    # def extract_slices(i, span):
+    #     starts = span
+    #     sizes = jnp.array(degrees) + 1
+    #     return lax.dynamic_slice(fn_coeffs_per_param[i], starts, sizes)
 
-    fn_coeffs_per_param = fn_coeffs[Jm]
+    # vectorized_extraction = vmap(extract_slices, in_axes=(0, 0))
 
-    def extract_slices(i):
-        starts = [spans[dim][i] for dim in range(ndim)]
-        sizes = [degrees[dim] + 1 for dim in range(ndim)]
-        return lax.dynamic_slice(fn_coeffs_per_param[i], starts, sizes)
+    # fn_coeffs_indexed = vectorized_extraction(
+    #     jnp.arange(fn_coeffs_per_param.shape[0]), spans[Jm]
+    # )
+    fn_coeffs_indexed = THB_coeff_indexing(
+        params, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
+    )
+    return fn_coeffs_indexed, ctrl_pts_stack, Jm
 
-    # Vectorize the function across the appropriate axis
-    vectorized_extraction = vmap(extract_slices, in_axes=0)
 
-    # Apply the vectorized function
-    fn_coeffs_indexed = vectorized_extraction(jnp.arange(fn_coeffs_per_param.shape[0]))
+def THB_coeff_indexing(
+    params, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
+):
+    def basis_fn_worker(param_idx, param):
+        max_lev = max(knotvectors.keys())
+        ndim = len(degrees)
+        cell_supp = ac_cells_supp[param_idx]
 
-    def get_basis_fns(basis_funcs):
-        if ndim == 3:
-            basis_fn_tp = jnp.einsum("ij, ik, il -> ijkl", *basis_funcs)
-        elif ndim == 2:
-            basis_fns_tp = jnp.einsum("ij, ik -> ijk", *basis_funcs)
-        repeat_ind = jnp.repeat(jnp.arange(basis_fns_tp.shape[0]), jnp.array(num_supp))
-        PHI = jnp.einsum("i... -> i", basis_fns_tp[repeat_ind] * fn_coeffs_indexed)
-        return PHI
-
-    if return_mode[0] and not return_mode[1]:
-        basis_fns = [
-            basis_fns_vmap(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
+        max_lev_cellIdx = [
+            findSpan(
+                fn_shapes[max_lev][dim],
+                degrees[dim],
+                param[dim],
+                knotvectors[max_lev][dim],
+            )
             for dim in range(ndim)
         ]
-        return get_basis_fns(basis_fns)
-    elif not return_mode[0] and return_mode[1]:
-        der_basis_fns = [
-            der_basis_fns_vmap(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
+
+        slice_tuple = tuple(
+            slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
             for dim in range(ndim)
-        ]
-        return get_basis_fns(der_basis_fns)
-    elif return_mode[0] and return_mode[1]:
-        basis_fns = [
-            basis_fns_vmap(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
-            for dim in range(ndim)
-        ]
-        der_basis_fns = [
-            der_basis_fns_vmap(params[:, dim], knotvectors[max_lev][dim], degrees[dim])
-            for dim in range(ndim)
-        ]
-        return get_basis_fns(basis_fns), get_basis_fns(der_basis_fns)
+        )
+        all_fn_coeffs = []
+        for fn in cell_supp:
+            fn_lev, fnIdx = fn
+            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
+            all_fn_coeffs.append(sub_coeff)
+        return np.stack(all_fn_coeffs)
+
+    COEFF = [basis_fn_worker(i, g) for i, g in enumerate(params)]
+
+    return np.vstack(COEFF)

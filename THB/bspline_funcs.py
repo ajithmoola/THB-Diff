@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 import jax.numpy as jnp
-from jax import jit, vmap, jacfwd
+from jax import jit, vmap, jacfwd, lax
 
 
 def refine_knotvector(knotvector, p):
@@ -51,12 +51,19 @@ def grevilleAbscissae(fn_sh, degrees, knotvectors):
     return CP
 
 
-@jit
 def compute_tensor_product(args):
     if len(args) == 2:
-        return jnp.einsum("i, j -> ij", *args)
+        return np.einsum("i, j -> ij", *args)
     if len(args) == 3:
-        return jnp.einsum("i, j, k -> ijk", *args, optimize=True)
+        return np.einsum("i, j, k -> ijk", *args)
+
+
+@jit
+def compute_tensor_product_jax(basis_fns):
+    if len(basis_fns) == 3:
+        return jnp.einsum("i,j,k->ijk", *basis_fns)
+    elif len(basis_fns) == 2:
+        return jnp.einsum("i,j->ij", *basis_fns)
 
 
 def findSpan(n, p, u, U):
@@ -79,7 +86,7 @@ def find_span_array_jax(params, U, degree):
     n = len(U) - degree - 1
     indices = jnp.searchsorted(U, params, side="right") - 1
     indices = jnp.where(indices > n, n, indices)
-    indices = jnp.where(params == U[-1], n - 1, indices)
+    indices = jnp.where(params == U[n + 1], n, indices)
     return indices
 
 
@@ -101,6 +108,7 @@ def basisFun(i, u, p, U):
     return N
 
 
+@jit
 def divisionbyzero(numerator, denominator):
     force_zero = jnp.logical_and(numerator == 0, denominator == 0)
 
