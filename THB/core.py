@@ -11,6 +11,7 @@ from functools import partial
 
 from THB.bspline_funcs import *
 from THB.utils import timer
+from THB.jax_funcs import Evaluate_JAX
 
 
 def compute_active_cells_active_supp(
@@ -417,6 +418,7 @@ def THB_basis_fns_tp_serial(
         numpy.ndarray: Array of basis function values.
         numpy.ndarray: Array of number of supports for each parameter.
     """
+    params = np.array(params)
 
     def basis_fn_worker(param_idx, param):
         max_lev = max(knotvectors.keys())
@@ -471,7 +473,7 @@ def THB_basis_fns_tp_serial(
         spans.append(b)
         COEFF.append(c)
 
-    return np.array(PHI).reshape(-1), np.array(spans), np.vstack(COEFF)
+    return np.array(PHI).reshape(-1)
 
 
 ######### Parallel Basis Function Tensorproduct Computation ###########
@@ -578,13 +580,13 @@ def THB_basis_fns(
     params: jnp.ndarray,
     fn_coeffs_indexed: jnp.ndarray,
     repeat_ind: List[int],
-    knotvectors: Tuple[np.ndarray],
+    max_knotvectors: Tuple[np.ndarray],
     degrees: Tuple[int],
 ) -> jnp.ndarray:
     ndim = len(degrees)
 
     basis_fns = [
-        basis_fns_vmap(params[:, dim], knotvectors[dim], degrees[dim])
+        basis_fns_vmap(params[:, dim], max_knotvectors[dim], degrees[dim])
         for dim in range(ndim)
     ]
 
@@ -604,12 +606,13 @@ def THB_evaluate(
 ):
     num_pts = params.shape[0]
     PHI = THB_basis_fns(params, fn_coeffs_indexed, repeat_ind, knotvectors, degrees)
+    output = Evaluate_JAX(ctrl_pts, Jm, PHI, repeat_ind, num_pts)
     prod = PHI * ctrl_pts[Jm]
     output = jnp.zeros((num_pts, ctrl_pts.shape[1])).at[repeat_ind].add(prod)
     return output
 
 
-# @partial(jit, static_argnums=(6))
+@partial(jit, static_argnums=(6))
 def THB_jacobian(
     params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
 ):
