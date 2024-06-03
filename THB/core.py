@@ -600,6 +600,21 @@ def THB_basis_fns(
     return PHI.reshape(-1, 1)
 
 
+@partial(jit, static_argnums=(4))
+def THB_basis_fns_Jacobian(
+    params: jnp.ndarray,
+    fn_coeffs_indexed: jnp.ndarray,
+    repeat_ind: List[int],
+    max_knotvectors: Tuple[np.ndarray],
+    degrees: Tuple[int],
+):
+    jac = jacfwd(THB_basis_fns, argnums=0)(
+        params, fn_coeffs_indexed, repeat_ind, max_knotvectors, degrees
+    )
+    indices = jnp.arange(params.shape[0])
+    return jac[:, :, indices, :]
+
+
 @partial(jit, static_argnums=(6))
 def THB_evaluate(
     params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
@@ -620,7 +635,8 @@ def THB_jacobian(
         params, ctrl_pts, fn_coeffs_indexed, repeat_ind, Jm, knotvectors, degrees
     )
     indices = jnp.arange(params.shape[0])
-    return jacobian[indices, :, indices, :]
+    output = jacobian[indices, :, indices, :]
+    return output
 
 
 def pre_process_data(
@@ -676,32 +692,46 @@ def pre_process_data(
 def THB_coeff_indexing(
     params, ac_cells_supp, fn_coeffs, fn_shapes, knotvectors, degrees
 ):
-    def basis_fn_worker(param_idx, param):
-        max_lev = max(knotvectors.keys())
-        ndim = len(degrees)
-        cell_supp = ac_cells_supp[param_idx]
+    max_lev = max(knotvectors.keys())
+    ndim = len(degrees)
 
-        max_lev_cellIdx = [
-            findSpan(
-                fn_shapes[max_lev][dim],
-                degrees[dim],
-                param[dim],
-                knotvectors[max_lev][dim],
+    spans = np.array(
+        [
+            np.array(
+                find_span_array_jax(
+                    params[:, dim], knotvectors[max_lev][dim], degrees[dim]
+                )
             )
-            for dim in range(ndim)
+            for dim in range(len(degrees))
         ]
+    ).T
+
+    def basis_fn_worker(param_idx, param):
+        # max_lev = max(knotvectors.keys())
+        # ndim = len(degrees)
+        cell_supp = ac_cells_supp[param_idx]
+        max_lev_cellIdx = spans[param_idx]
+        # max_lev_cellIdx = [
+        #     findSpan(
+        #         fn_shapes[max_lev][dim],
+        #         degrees[dim],
+        #         param[dim],
+        #         knotvectors[max_lev][dim],
+        #     )
+        #     for dim in range(ndim)
+        # ]
 
         slice_tuple = tuple(
             slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
             for dim in range(ndim)
         )
-        all_fn_coeffs = []
-        for fn in cell_supp:
-            fn_lev, fnIdx = fn
-            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-            all_fn_coeffs.append(sub_coeff)
+
+        all_fn_coeffs = [
+            fn_coeffs[fn_level][fnIdx][slice_tuple] for fn_level, fnIdx in cell_supp
+        ]
+
         return np.stack(all_fn_coeffs)
 
-    COEFF = [basis_fn_worker(i, g) for i, g in enumerate(params)]
+    COEFF = [basis_fn_worker(i, g) for i, g in tqdm(enumerate(params))]
 
     return np.vstack(COEFF)
