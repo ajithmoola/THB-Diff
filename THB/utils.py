@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 from time import time
+from tqdm import tqdm
+from typing import Dict, Tuple, List
+
 
 # from OCC.Core.Geom import Geom_BSplineSurface
 # from OCC.Core.TColgp import TColgp_Array2OfPnt
@@ -24,373 +27,115 @@ def timer(func):
     return wrap_func
 
 
-class THB_plot:
-
-    def __init__(self, dir, figname):
-        self.dir = dir
-        self.fig = plt.figure()
-        self.figname = figname
-        self.ax = {}
-
-    def add_3Daxis(self, axis_name):
-        ax = self.fig.add_subplot(projection="3d")
-        self.ax[axis_name] = ax
-
-    def add_2Daxis(self, axis_name):
-        ax = self.fig.add_subplot()
-        self.ax[axis_name] = ax
-
-    def save_all_axes_seperately(self, dpi=150):
-        for ax in self.ax.keys():
-            ax.remove()
-
-            new_fig = plt.figure()
-            new_fig.add_axes(ax)
-
-            self.save_fig(new_fig)
-
-    def save_fig(self, fig=None, dpi=150):
-        if fig is not None:
-            save_fig = fig
-        else:
-            save_fig = self.fig
-
-        save_fig.savefig(
-            self.dir + "/" + self.figname + ".pdf",
-            dpi=dpi,
-            bbox_inches="tight",
-            pad_inches=0,
-            transparent=True,
-            format="pdf",
-        )
-
-    def plotAdaptiveGrid(self, axisname, THB):
-        if THB.h_space.ndim == 2:
-            ax = self.ax[axisname]
-            ax = plot2DAdaptiveGrid(
-                ax,
-                THB.ac_cells,
-                THB.GA,
-                THB.h_space.knotvectors,
-                THB.fn_coeffs,
-                THB.h_space.sh_fns,
-                THB.h_space.degrees,
-            )
-        elif THB.h_space.ndim == 3:
-            plot3DAdaptiveGrid(
-                self.dir + "/" + axisname,
-                THB.ac_cells,
-                THB.GA,
-                THB.h_space.knotvectors,
-                THB.fn_coeffs,
-                THB.h_space.sh_fns,
-                THB.h_space.degrees,
-            )
-
-    def plot_3D_wireframe_surface(
-        self, axisname, xyz, shape, linestyle="solid", linewidth=1, color="green"
-    ):
-        ax = self.ax[axisname]
-        xyz = xyz.reshape(*shape, 3)
-        ax.plot_wireframe(
-            xyz[:, :, 0],
-            xyz[:, :, 1],
-            xyz[:, :, 2],
-            linestyle=linestyle,
-            linewidth=linewidth,
-            color=color,
-        )
-        ax.set_axis_off()
-        ax.grid(False)
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0)
-
-    def plot_3D_surface(
-        self, axisname, xyz, shape, color="grey", rstride=None, cstride=None
-    ):
-        ax = self.ax[axisname]
-        xyz = xyz.reshape(*shape, 3)
-        ax.plot_surface(
-            xyz[:, :, 0],
-            xyz[:, :, 1],
-            xyz[:, :, 2],
-            color=color,
-            rstride=rstride,
-            cstride=cstride,
-            edgecolor=None,
-            linewidth=0,
-        )
-        ax.set_axis_off()
-        ax.grid(False)
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0)
+def CP_arr_to_dict(CP_arr, sh_fns, num_levels):
+    CP_arr = np.array(CP_arr)
+    nCP = np.array([0] + [np.prod(sh_fns[lev]) for lev in range(num_levels)]).cumsum()
+    ctrl_pts = {
+        lev: CP_arr[nCP[lev] : nCP[lev + 1]].reshape(*sh_fns[lev], CP_arr.shape[1])
+        for lev in range(num_levels)
+    }
+    return ctrl_pts
 
 
-def plot2DGrid(ax, cells, knotvectors, show_fig=True):
+def compute_multilevel_bezier_extraction_operators(
+    params: List[List[float]],
+    ac_spans: List[Tuple[int]],
+    ac_cells_supp: Dict[int, Dict[Tuple[int], List[Tuple[int]]]],
+    fn_coeffs: Dict[int, Dict[int, np.ndarray]],
+    cell_shapes: Dict[int, Tuple[int]],
+    fn_shapes: Dict[int, Tuple[int]],
+    knotvectors: Dict[int, Dict[int, np.ndarray]],
+    degrees: Tuple[int],
+) -> List[np.ndarray]:
+    """
+    Compute the multilevel Bezier extraction operators.
 
+    Args:
+        params (list): List of parameter values.
+        ac_spans (list): List of active spans.
+        ac_cells_supp (dict): Dictionary containing the active cells and their
+        supports at each level.
+        fn_coeffs (dict): Dictionary containing the coefficients of basis
+        functions at each level.
+        fn_shapes (dict): Dictionary containing the shape of basis functions at
+        each level.
+        knotvectors (dict): Dictionary containing the knot vectors at each level.
+        degrees (list): List of degrees for each dimension.
+
+    Returns:
+        (list): List of beizer extraction operators
+    """
     max_lev = max(knotvectors.keys())
-    knots = {
-        lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(2)}
-        for lev in range(max_lev + 1)
-    }
-
-    for lev in cells.keys():
-        for cellIdx in np.ndindex(cells[lev].shape):
-            if cells[lev][cellIdx] == 1:
-                ll = [knots[lev][0][cellIdx[0]], knots[lev][1][cellIdx[1]]]
-                ur = [knots[lev][0][cellIdx[0] + 1], knots[lev][1][cellIdx[1] + 1]]
-
-                lr = [ur[0], ll[1]]
-                ul = [ll[0], ur[1]]
-
-                x_coo = [ll[0], lr[0], ur[0], ul[0], ll[0]]
-                y_coo = [ll[1], lr[1], ur[1], ul[1], ll[1]]
-
-                ax.plot(x_coo, y_coo, color="k")
-
-    ax.set_box_aspect(1)
-    ax.set_axis_off()
-    plt.margins(0)
-
-    if show_fig:
-        plt.show()
-
-    return ax
-
-
-def plot3DGrid(cells, knotvectors):
-
-    max_lev = max(knotvectors.keys())
-    knots = {
-        lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(3)}
-        for lev in range(max_lev + 1)
-    }
-
-    corners = []
-
-    for lev in cells.keys():
-        for cellIdx in np.ndindex(cells[lev].shape):
-            if cells[lev][cellIdx] == 1:
-                x1 = knots[lev][0][cellIdx[0]]
-                y1 = knots[lev][1][cellIdx[1]]
-                z1 = knots[lev][2][cellIdx[2]]
-                x2 = knots[lev][0][cellIdx[0] + 1]
-                y2 = knots[lev][1][cellIdx[1] + 1]
-                z2 = knots[lev][2][cellIdx[2] + 1]
-
-                points = np.array(
-                    [
-                        [x1, y1, z1],
-                        [x2, y1, z1],
-                        [x2, y2, z1],
-                        [x1, y2, z1],
-                        [x1, y1, z2],
-                        [x2, y1, z2],
-                        [x2, y2, z2],
-                        [x1, y2, z2],
-                    ]
-                )
-
-                corners.append(points)
-
-    num_cells = len(corners)
-    corners = np.vstack(corners)
-    unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
-
-    cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
-
-    cells = np.vstack(
-        [
-            np.concatenate(
-                [np.array([8]), inverse_indices[8 * i : 8 * i + 8]], dtype=np.int_
-            )
-            for i in range(num_cells)
-        ],
-        dtype=np.int_,
-    ).ravel()
-
-    grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
-
-    grid.save("unstructured_grid.vtu")
-
-
-def plot2DAdaptiveGrid(
-    ax, ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees
-):
     ndim = len(degrees)
-    max_lev = len(knot_vectors.keys()) - 1
-    knots = {
-        lev: {dim: np.unique(knot_vectors[lev][dim]) for dim in range(ndim)}
-        for lev in range(max_lev + 1)
-    }
-    for lev in range(max_lev + 1):
-        for cell in ac_cells[lev].keys():
-            supp = ac_cells[lev][cell]
 
-            x1 = knots[lev][0][cell[0]]
-            y1 = knots[lev][1][cell[1]]
-            x2 = knots[lev][0][cell[0] + 1]
-            y2 = knots[lev][1][cell[1] + 1]
-
-            if y2 == 1:
-                y2 -= 1e-9
-            if x2 == 1:
-                x2 -= 1e-9
-            if y1 == 0:
-                y1 += 1e-9
-            if x1 == 0:
-                x1 += 1e-9
-
-            ll = [x1, y1]
-            ur = [x2, y2]
-            lr = [x2, y1]
-            ul = [x1, y2]
-
-            param = np.array([ll, lr, ur, ul])
-            out = np.zeros((4, 2))
-            phi = []
-            for i, g in enumerate(param):
-                max_lev_cellIdx = [
-                    findSpan(
-                        fn_shapes[max_lev][dim] - 1,
-                        degrees[dim],
-                        g[dim],
-                        knot_vectors[max_lev][dim],
-                    )
-                    for dim in range(ndim)
-                ]
-                basis_fns = [
-                    basisFun(
-                        max_lev_cellIdx[dim],
-                        g[dim],
-                        degrees[dim],
-                        knot_vectors[max_lev][dim],
-                    )
-                    for dim in range(ndim)
-                ]
-                fn_values = []
-                for fn in supp:
-                    fn_lev, fnIdx = fn
-                    slice_tuple = tuple(
-                        slice(
-                            max_lev_cellIdx[dim] - degrees[dim],
-                            max_lev_cellIdx[dim] + 1,
-                        )
-                        for dim in range(ndim)
-                    )
-                    sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-                    fn_tp = compute_tensor_product(basis_fns)
-                    fn_value = np.sum(sub_coeff * fn_tp)
-                    out[i] += fn_value * ctrl_pts[fn_lev][fnIdx]
-                    fn_values.append(fn_value)
-                phi.append(np.array(fn_values))
-            out = np.vstack([out, out[0]])
-            ax.plot(out[:, 0], out[:, 1], color="k")
-    ax.set_box_aspect(1)
-    ax.set_axis_off()
-    plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-    plt.margins(0)
-    plt.show()
-
-
-def plot3DAdaptiveGrid(
-    filename, ac_cells, ctrl_pts, knot_vectors, fn_coeffs, fn_shapes, degrees
-):
-    ndim = len(degrees)
-    max_lev = len(knot_vectors.keys()) - 1
-    knots = {
-        lev: {dim: np.unique(knot_vectors[lev][dim]) for dim in range(ndim)}
-        for lev in range(max_lev + 1)
-    }
-
-    corners = []
-    for lev in range(max_lev + 1):
-        for cell in ac_cells[lev].keys():
-            supp = ac_cells[lev][cell]
-
-            x1 = knots[lev][0][cell[0]]
-            y1 = knots[lev][1][cell[1]]
-            z1 = knots[lev][2][cell[2]]
-            x2 = knots[lev][0][cell[0] + 1]
-            y2 = knots[lev][1][cell[1] + 1]
-            z2 = knots[lev][2][cell[2] + 1]
-
-            # if y2 == 1:
-            #     y2 -= 1e-9
-            # if x2 == 1:
-            #     x2 -= 1e-9
-            # if z2 == 1:
-            #     z2 -= 1e-9
-            # if y1 == 0:
-            #     y1 += 1e-9
-            # if x1 == 0:
-            #     x1 += 1e-9
-            # if z1 == 0:
-            #     z1 += 1e-9
-
-            llf = [x1, y1, z1]
-            lrf = [x2, y1, z1]
-            urf = [x2, y2, z1]
-            ulf = [x1, y2, z1]
-            llb = [x1, y1, z2]
-            lrb = [x2, y1, z2]
-            urb = [x2, y2, z2]
-            ulb = [x1, y2, z2]
-
-            param = np.array([llf, lrf, urf, ulf, llb, lrb, urb, ulb])
-            out = np.zeros((8, 3))
-            for i, g in enumerate(param):
-                max_lev_cellIdx = [
-                    findSpan(
-                        fn_shapes[max_lev][dim] - 1,
-                        degrees[dim],
-                        g[dim],
-                        knot_vectors[max_lev][dim],
-                    )
-                    for dim in range(ndim)
-                ]
-                basis_fns = [
-                    basisFun(
-                        max_lev_cellIdx[dim],
-                        g[dim],
-                        degrees[dim],
-                        knot_vectors[max_lev][dim],
-                    )
-                    for dim in range(ndim)
-                ]
-                fn_values = []
-                for fn in supp:
-                    fn_lev, fnIdx = fn
-                    slice_tuple = tuple(
-                        slice(
-                            max_lev_cellIdx[dim] - degrees[dim],
-                            max_lev_cellIdx[dim] + 1,
-                        )
-                        for dim in range(ndim)
-                    )
-                    sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
-                    fn_tp = compute_tensor_product(basis_fns)
-                    fn_value = np.sum(sub_coeff * fn_tp)
-                    out[i] += fn_value * ctrl_pts[fn_lev][fnIdx]
-
-            corners.append(out)
-
-    num_cells = len(corners)
-    corners = np.vstack(corners)
-    unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
-
-    cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
-
-    cells = [
-        np.concatenate(
-            [np.array([8]), inverse_indices[8 * i : 8 * i + 8]], dtype=np.int_
-        )
-        for i in range(num_cells)
+    Cmax = [
+        bezier_extraction(knotvectors[max_lev][dim], degrees[dim])
+        for dim in range(ndim)
     ]
-    cells = np.vstack(cells, dtype=np.int_).ravel()
-    grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
 
-    grid.save(filename=filename + ".vtu")
+    Cmax_tp = np.zeros(
+        (
+            *cell_shapes[max_lev],
+            *tuple(np.array(degrees) + 1),
+            *tuple(np.array(degrees) + 1),
+        )
+    )
+
+    def compute_coeff_tensor_product(args):
+        if len(args) == 2:
+            return np.einsum("ij, kl -> ikjl", *args, optimize=True)
+        elif len(args) == 3:
+            return np.einsum("ij, kl, mn -> ikmjln", *args, optimize=True)
+
+    for cell in np.ndindex(cell_shapes[max_lev]):
+        Cmax_tp[cell] = compute_coeff_tensor_product(
+            [Cmax[dim][cell[dim]] for dim in range(ndim)]
+        )
+
+    def compute_bezier_projection(args, ndim):
+        if ndim == 2:
+            return np.einsum("ij, ijkl -> kl", *args, optimize=True)
+        elif ndim == 3:
+            return np.einsum("ijk, ijklmn -> lmn", *args, optimize=True)
+
+    C = []
+    for i, g in enumerate(tqdm(params)):
+        cell_lev, cellIdx = ac_spans[i]
+        ac_supp = ac_cells_supp[cell_lev][cellIdx]
+        max_lev_cellIdx = [
+            findSpan(
+                fn_shapes[max_lev][dim], degrees[dim], g[dim], knotvectors[max_lev][dim]
+            )
+            for dim in range(ndim)
+        ]
+        Cmax_local = Cmax_tp[
+            tuple(max_lev_cellIdx[dim] - degrees[dim] for dim in range(ndim))
+        ]
+        C_local = np.zeros((len(ac_supp), *tuple(np.array(degrees) + 1)))
+        for i, fn in enumerate(ac_supp):
+            fn_lev, fnIdx = fn
+            slice_tuple = tuple(
+                slice(max_lev_cellIdx[dim] - degrees[dim], max_lev_cellIdx[dim] + 1)
+                for dim in range(ndim)
+            )
+            sub_coeff = fn_coeffs[fn_lev][fnIdx][slice_tuple]
+            C_local[i] = compute_bezier_projection([sub_coeff, Cmax_local], ndim=ndim)
+        C.append(C_local)
+    return C
+
+
+def refine_ctrl_pts(CP, Coeffs, curr_fn_state, prev_fn_state, sh_fns, num_levels, ndim):
+    for lev in range(1, num_levels):
+        curr_coeff = Coeffs[lev]
+        for fn in np.ndindex(sh_fns[lev]):
+            if prev_fn_state[lev][fn] == 0 and curr_fn_state[lev][fn] == 1:
+                refine_coeff = [curr_coeff[dim].T[fn[dim]] for dim in range(ndim)]
+                refine_coeff_tp = compute_tensor_product(refine_coeff)
+                CP[lev][CP] = np.sum(
+                    refine_coeff_tp[..., np.newaxis] * CP[lev - 1],
+                    axis=tuple(range(len(refine_coeff_tp.shape))),
+                )
+    return CP
 
 
 # def BSplineSurf_to_STEP(CP, knotvectors, degrees, fname):
@@ -459,53 +204,3 @@ def plot3DAdaptiveGrid(
 #         print("Successfully exported B-spline surface to STEP file.")
 #     else:
 #         print("Failed to export B-spline surface to STEP file.")
-
-
-def plot_active_3D_cells(ac_cells, knotvectors, wd, filename):
-    max_lev = max(ac_cells.keys())
-    ndim = len(knotvectors[0])
-    knots = {
-        lev: {dim: np.unique(knotvectors[lev][dim]) for dim in range(ndim)}
-        for lev in range(max_lev + 1)
-    }
-
-    corners = []
-    for lev in range(max_lev + 1):
-        for cell in ac_cells[lev].keys():
-
-            x1 = knots[lev][0][cell[0]]
-            y1 = knots[lev][1][cell[1]]
-            z1 = knots[lev][2][cell[2]]
-            x2 = knots[lev][0][cell[0] + 1]
-            y2 = knots[lev][1][cell[1] + 1]
-            z2 = knots[lev][2][cell[2] + 1]
-
-            llf = [x1, y1, z1]
-            lrf = [x2, y1, z1]
-            urf = [x2, y2, z1]
-            ulf = [x1, y2, z1]
-            llb = [x1, y1, z2]
-            lrb = [x2, y1, z2]
-            urb = [x2, y2, z2]
-            ulb = [x1, y2, z2]
-
-            boxes = np.array([llf, lrf, urf, ulf, llb, lrb, urb, ulb])
-
-            corners.append(boxes)
-
-    num_cells = len(corners)
-    corners = np.vstack(corners)
-    unique_points, inverse_indices = np.unique(corners, axis=0, return_inverse=True)
-
-    cell_types = np.full(num_cells, pv.CellType.HEXAHEDRON, dtype=np.uint8)
-
-    cells = [
-        np.concatenate(
-            [np.array([8]), inverse_indices[8 * i : 8 * i + 8]], dtype=np.int_
-        )
-        for i in range(num_cells)
-    ]
-    cells = np.vstack(cells, dtype=np.int_).ravel()
-    grid = pv.UnstructuredGrid(cells, cell_types, unique_points)
-
-    grid.save(filename=wd + "/" + filename + ".vtu")
