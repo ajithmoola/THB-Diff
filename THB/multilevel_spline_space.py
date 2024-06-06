@@ -4,7 +4,6 @@ from copy import deepcopy
 from typing import Dict, Tuple, List
 
 
-from THB.core import get_children_fns, support_cells_multi
 from THB.bspline_funcs import (
     refine_knotvector,
     compute_tensor_product,
@@ -115,6 +114,9 @@ class HierarchicalSplineSpace:
         self.fns = H
 
         self.fn_states.append(H)
+
+        self.compute_active_cells_active_supp()
+        self.compute_refinement_operators()
 
     def compute_active_cells_active_supp(
         self,
@@ -261,7 +263,7 @@ class HierarchicalSplineSpace:
 
     def _refine_basis_fn(self, fnIdx, level):
         assert level < self.num_levels - 1
-        supp_cells = support_cells_multi(level, fnIdx)
+        supp_cells = self._support_cells_multi(level, fnIdx)
         for cell in supp_cells:
             self._refine_cell(cell, level)
 
@@ -314,7 +316,7 @@ class HierarchicalSplineSpace:
 
         support_cells_md = np.array(
             np.meshgrid(*all_support_cells, indexing="ij")
-        ).T.reshape(-1, len(self.ndim))
+        ).T.reshape(-1, self.ndim)
 
         return [tuple(cell) for cell in support_cells_md]
 
