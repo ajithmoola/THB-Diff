@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: THBDiff
+Version: 0.1
+Summary: Volumetric parametrization module
+Author-email: Ajith Moola <arma@iastate.edu>
+Requires-Python: >=3.8
+Requires-Dist: numpy
+Requires-Dist: pybind11>=2.10.0
