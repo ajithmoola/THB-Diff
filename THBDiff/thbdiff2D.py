@@ -220,27 +220,23 @@ class HierarchicalSplineSpace:
         }
 
     def build_hierarchy_from_domain_sequence(self):
-        H = {level: np.zeros(self.sh_fns[level]) for level in range(self.num_levels)}
-        H[0] = np.ones_like(H[0])
+        refined = {self.max_lev: np.zeros(self.sh_cells[self.max_lev], dtype=bool)}
+        omega = {self.max_lev: self.cells[self.max_lev] == 1}
+        for lev in range(self.max_lev - 1, -1, -1):
+            child_shape = [s for n in self.sh_cells[lev] for s in (n, 2)]
+            refined[lev] = omega[lev + 1].reshape(child_shape).any(
+                axis=tuple(range(1, 2 * self.ndim, 2))
+            )
+            omega[lev] = (self.cells[lev] == 1) | refined[lev]
 
-        for lev in range(0, self.num_levels - 1):
-            deactivated_fns = []
-            H_a = list(zip(*np.nonzero(H[lev])))
-            for fn in H_a:
+        H = {level: np.zeros(self.sh_fns[level]) for level in range(self.num_levels)}
+        for lev in range(self.num_levels):
+            for fn in np.ndindex(self.sh_fns[lev]):
                 supp_cells = self._support_cells_multi(lev, fn)
-                cell_bool = [
-                    True if self.cells[lev][cell] == 1.0 else False
-                    for cell in supp_cells
-                ]
-                if np.all(np.array(cell_bool) == False):
-                    H[lev][fn] = 0
-                    deactivated_fns.append(fn)
-            if not deactivated_fns:
-                break
-            children = [self._get_children_fns(de_fn, lev) for de_fn in deactivated_fns]
-            H_b = set([item for sublist in children for item in sublist])
-            for idx in H_b:
-                H[lev + 1][idx] = 1
+                in_omega = all(omega[lev][cell] for cell in supp_cells)
+                fully_refined = all(refined[lev][cell] for cell in supp_cells)
+                if in_omega and not fully_refined:
+                    H[lev][fn] = 1
 
         self.fns = H
 
@@ -293,27 +289,15 @@ class HierarchicalSplineSpace:
             for lev in range(max_lev)
         }
 
-        projection_coeff = {}
-        projection_coeff[max_lev - 2] = coeffs_tp[max_lev - 1]
-
-        # Computes the projection coefficients for all levels to the finest level
-        for lev in range(max_lev - 3, -1, -1):
-            projection_coeff[lev] = np.einsum(
-                "ijkl, klmn -> ijmn", *[coeffs_tp[lev + 1], projection_coeff[lev + 1]]
-            )
-
-        # Truncation of basis functions
+        # Truncation of basis functions against every finer level
         for lev in range(max_lev - 1, -1, -1):
             curr_coeff_tp = deepcopy(coeffs_tp[lev])
-            trunc_indices = np.where(self.fns[lev + 1] == 1)
-
-            for fn in np.ndindex(self.fns[lev].shape):
-                curr_coeff_tp[fn][trunc_indices] = 0
-
-            if lev < (max_lev - 1):
+            curr_coeff_tp[..., self.fns[lev + 1] == 1] = 0
+            for fine_lev in range(lev + 1, max_lev):
                 curr_coeff_tp = np.einsum(
-                    "ijkl, klmn -> ijmn", *[curr_coeff_tp, projection_coeff[lev]]
+                    "ijkl, klmn -> ijmn", *[curr_coeff_tp, coeffs_tp[fine_lev]]
                 )
+                curr_coeff_tp[..., self.fns[fine_lev + 1] == 1] = 0
 
             fn_projection_coeffs[lev] = np.array(curr_coeff_tp).astype(np.float32)
 
@@ -432,6 +416,8 @@ class HierarchicalSplineSpace:
             self._refine_cell(cell, level)
 
     def _refine_cell(self, cellIdx, level):
+        if self.cells[level][cellIdx] != 1:
+            return
         self.cells[level][cellIdx] = 0
         children_cells = []
         for offset in product(range(2), repeat=len(cellIdx)):
@@ -443,7 +429,7 @@ class HierarchicalSplineSpace:
 
     def _collapse_cell(self, cellIdx, level):
         ancestor_cell = tuple(np.array(cellIdx) // 2)
-        self.cells[level - 1][cellIdx] = 1
+        self.cells[level - 1][ancestor_cell] = 1
         children_cells = []
         for offset in product(range(2), repeat=len(ancestor_cell)):
             children_cells.append(
@@ -521,7 +507,6 @@ class HierarchicalSplineSpace:
             self.knotvectors[self.max_lev],
             self.degrees,
         )
-        print(params.shape[0], PHI.sum())
         pts = np.array(
             evaluate(
                 params,
@@ -633,7 +618,6 @@ if __name__ == "__main__":
     tp = TensorProduct([bs1, bs2])
     h_space = HierarchicalSplineSpace(tp, num_levels=3)
     h_space.build_hierarchy_from_domain_sequence()
-    print("yes")
     h_space._refine_basis_fn((5, 5), 0)
     h_space._refine_basis_fn((2, 2), 0)
     h_space.build_hierarchy_from_domain_sequence()
