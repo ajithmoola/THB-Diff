@@ -1,4 +1,4 @@
-from THBDiff.thbdiff2D import BSpline, HierarchicalSplineSpace, TensorProduct
+from THBDiff.archive.thbdiff2D import BSpline, HierarchicalSplineSpace, TensorProduct
 import numpy as np
 
 if __name__ == "__main__":

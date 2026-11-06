@@ -106,7 +106,7 @@ def get_CP_indices(knotvectors, degrees, params):
 
 if __name__ == "__main__":
     import jax
-    from core_funcs import generate_parametric_coordinates
+    from bspline_funcs import generate_parametric_coordinates
 
     # from plot import plot_valve_wireframe
 

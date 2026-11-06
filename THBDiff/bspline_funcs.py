@@ -181,3 +181,21 @@ def assemble_Tmatrix(knotVec, newKnotVec, knotVec_len, newKnotVec_len, p):
 
             T1 = T2
         return T1
+
+
+@partial(jit, static_argnums=(2,))
+def compute_basis_at_point_full(param, knotvectors, degrees):
+    b_fns = [
+        basis_fns_full(param[dim : dim + 1], knotvectors[dim], degrees[dim]).squeeze()
+        for dim in range(2)
+    ]
+    tp = jnp.outer(b_fns[0], b_fns[1])
+    return tp
+
+
+@partial(jit, static_argnums=(2))
+def compute_tensor_product_full(params, knotvectors, degrees):
+    basis_fns = vmap(compute_basis_at_point_full, in_axes=(0, None, None))(
+        params, knotvectors, degrees
+    )
+    return basis_fns
