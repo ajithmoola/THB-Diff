@@ -2,6 +2,10 @@
 
 Differentiable truncated hierarchical B-splines (THB-splines) in JAX, for 2D and 3D.
 
+The paper can be accessed [here](https://rdcu.be/dyLQl).
+
+![image](https://github.com/ajithmoola/THB/assets/113499868/3bb2f1d4-de0a-4d86-a8f5-db4c7eab0466)
+
 ## Install
 
 ```bash
@@ -47,3 +51,13 @@ For 2D, use `HierarchicalSplineSpace`, `evaluate` and `compute_thb_jacobian` fro
 - `THBDiff/bspline_funcs.py`: B-spline basis functions, knot refinement, Greville points
 - `THBDiff/tmatrix_cpp.cpp`: C++ knot-insertion matrix assembly
 - `WD/testing3d.py`: 3D refinement example that writes the adaptive grid as a PLY wireframe
+
+## Citation
+
+```
+@Article{thbdiff,
+author={Moola, Ajith and Balu, Aditya and Krishnamurthy, Adarsh and Pawar, Aishwarya},
+title={THB-Diff: a GPU-accelerated differentiable programming framework for THB-splines},
+journal={Engineering with Computers},
+year={2023},}
+```
