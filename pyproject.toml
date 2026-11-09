@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "THBDiff"
 version = "0.1"
 authors = [{name = "Ajith Moola", email = "arma@iastate.edu"}]
-dependencies = ["numpy", "pybind11>=2.10.0"]
-description = "Volumetric parametrization module"
+dependencies = ["numpy", "jax", "tqdm", "matplotlib"]
+description = "Differentiable truncated hierarchical B-splines (THB-splines) in JAX"
 requires-python = ">=3.8"
 
 [tool.setuptools]

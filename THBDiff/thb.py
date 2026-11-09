@@ -3,7 +3,6 @@ from copy import deepcopy
 from typing import Dict, Tuple, List
 from functools import partial
 
-import pyvista as pv
 import jax.numpy as jnp
 from jax import jit, vmap, jacfwd
 import numpy as np
