@@ -20,12 +20,13 @@ except ImportError:
 
 def refine_knotvector(knotvector, p):
     # knots = jnp.unique(knotvector)
+    knotvector = np.asarray(knotvector, dtype=np.float64)
     valid_knots = knotvector[p:-p]
     mids = 0.5 * (valid_knots[1:] + valid_knots[:-1])
-    refined_knotvector = jnp.concatenate(
+    refined_knotvector = np.concatenate(
         [
             knotvector[:p],
-            jnp.unique(jnp.sort(jnp.concatenate([valid_knots, mids]))),
+            np.unique(np.sort(np.concatenate([valid_knots, mids]))),
             knotvector[-p:],
         ]
     )

@@ -138,7 +138,7 @@ class HierarchicalSplineSpace3D(HierarchicalSplineSpace):
             refined = np.einsum(
                 "ai, bj, ck, abcd -> ijkd", C[0], C[1], C[2], ctrl_pts[lev - 1], optimize=True
             )
-            new = (CP_status[lev] == 0) & (self.fns[lev] == 1)
+            new = CP_status[lev] == 0
             ctrl_pts[lev][new] = refined[new]
 
         return self.CP_arr_to_dict(jnp.array(self.CP_dict_to_arr(ctrl_pts)))

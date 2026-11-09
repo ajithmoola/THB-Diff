@@ -154,8 +154,10 @@ class HierarchicalSplineSpace:
         omega = {self.max_lev: self.cells[self.max_lev] == 1}
         for lev in range(self.max_lev - 1, -1, -1):
             child_shape = [s for n in self.sh_cells[lev] for s in (n, 2)]
-            refined[lev] = omega[lev + 1].reshape(child_shape).any(
-                axis=tuple(range(1, 2 * self.ndim, 2))
+            refined[lev] = (
+                omega[lev + 1]
+                .reshape(child_shape)
+                .any(axis=tuple(range(1, 2 * self.ndim, 2)))
             )
             omega[lev] = (self.cells[lev] == 1) | refined[lev]
 
@@ -276,12 +278,21 @@ class HierarchicalSplineSpace:
             jnp.int32
         )
 
+        cell_supp_ids = {}
+        for lev_cells in self.ac_cells.values():
+            for cell_supp in lev_cells.values():
+                cell_supp_ids[id(cell_supp)] = np.array(
+                    [
+                        n_fns[fn_lev] + np.ravel_multi_index(fnIdx, self.sh_fns[fn_lev])
+                        for fn_lev, fnIdx in cell_supp
+                    ],
+                    dtype=np.int64,
+                )
+
         Jm = jnp.array(
-            [
-                n_fns[fn_lev] + np.ravel_multi_index(fnIdx, self.sh_fns[fn_lev])
-                for cell_supp in active_cell_supp
-                for fn_lev, fnIdx in cell_supp
-            ]
+            np.concatenate(
+                [cell_supp_ids[id(cell_supp)] for cell_supp in active_cell_supp]
+            )
         )
 
         return repeat_ind, Jm
@@ -507,7 +518,7 @@ class HierarchicalSplineSpace:
         for lev in range(1, self.num_levels):
             curr_coeff = self.Coeff[lev - 1]
             for CP in np.ndindex(self.fns[lev].shape):
-                if CP_status[lev][CP] == 0 and self.fns[lev][CP] == 1:
+                if CP_status[lev][CP] == 0:
                     cp_coeff = [curr_coeff[dim].T[CP[dim]] for dim in range(self.ndim)]
                     tp = np.einsum("i, j -> ij", *cp_coeff)
                     ctrl_pts[lev][CP] = np.sum(
